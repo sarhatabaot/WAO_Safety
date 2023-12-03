@@ -13,7 +13,7 @@ class UnitConverter:
         return speed_mph / 1.60934
 
 
-config_path = "~/python/config.toml"
+config_path = "/home/ocs/python/security/WeatherSafety/config.toml"
 
 
 class LoopData:
@@ -49,7 +49,7 @@ class LoopData:
 
         temperature_out = LoopData.parse_temperature(packet[12:14])
 
-        wind_speed_mph = int.from_bytes(packet[14])
+        wind_speed_mph = packet[14]
         wind_speed = UnitConverter.mph_to_kph(wind_speed_mph)
 
         wind_direction = int.from_bytes(packet[16:18], "little")
@@ -73,7 +73,8 @@ class LoopData:
         crc = 0
 
         for i in range(len(packet)):
-            crc = LoopData.crc_table[(crc >> 8) ^ packet[i]] ^ (crc << 8)
+            print("val = " + str((crc >> 8) ^ packet[i]))
+            crc = LoopData.crc_table[(crc >> 8) ^ packet[i]] ^ ((crc << 8) % (2 ** 16))
 
         return crc == 0
 
@@ -111,7 +112,6 @@ class LoopData:
                  0x6e17, 0x7e36, 0x4e55, 0x5e74, 0x2e93, 0x3eb2, 0xed1, 0x1ef0]
 
 
-
 class VantagePro2:
     __wakeup_message = b"\n"
     __wakeup_response_length = 2
@@ -131,15 +131,17 @@ class VantagePro2:
 
         self.ser = serial.Serial(com_port, baud_rate, timeout=2.0, parity=serial.PARITY_NONE)
 
+        print("connected to serial port")
+
         self.last_measurement = None
         self.last_measurement_time = None
 
     def wakeup(self):
         # start wakeup sequence
         for _ in range(VantagePro2.__wakeup_attempts):
-            self.ser.write(10)
+            self.ser.write(b'\n')
             response = self.ser.read(VantagePro2.__wakeup_response_length)
-
+            print("got " + str(response))
             if len(response) == VantagePro2.__wakeup_response_length:
                 if VantagePro2.__is_valid_wakeup_response(response):
                     return True
@@ -150,7 +152,10 @@ class VantagePro2:
         return True
 
     def get_measurement(self):
+        print("measurement requested")
+
         if not self.wakeup():
+            print("console sleeping")
             return None
 
         if self.is_new_measure_required():
