@@ -1,3 +1,6 @@
 [VantagePro2]
 com_port = ""
 baud_rate = 19200
+[OutsideArduino]
+com_port = ""
+baud_rate = 0

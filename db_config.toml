@@ -1,0 +1,6 @@
+[database]
+host = "10.23.1.25"
+name = "last_operational"
+user = "ocs"
+password = "physics"
+schema = "sensosrs"
