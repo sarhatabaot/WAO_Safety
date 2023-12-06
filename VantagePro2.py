@@ -126,6 +126,7 @@ class VantagePro2:
         with open(CONFIG_PATH, "r") as f:
             doc = load(f)
             com_port = doc["VantagePro2"]["com_port"]
+            print(f"vantage com port: {com_port}")
             baud_rate = doc["VantagePro2"]["baud_rate"]
 
         self.ser = serial.Serial(com_port, baud_rate, timeout=2.0, parity=serial.PARITY_NONE)

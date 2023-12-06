@@ -27,7 +27,7 @@ def get_db_schema() -> str:
     with open(CONFIG_PATH, "r") as config_fp:
         config_doc = tomlkit.load(config_fp)
 
-        return  config_doc["database"]["schema"]
+        return config_doc["database"]["schema"]
 
 
 class DbManager:
@@ -48,15 +48,24 @@ class DbManager:
 
     def connect(self):
         self.engine = create_engine(self.db_url)
-
+        print("engine")
         self.metadata = MetaData()
-        self.metadata.reflect(self.engine, shcema=self.schema, only=["davis", "arduino_in"])
+        print(self.metadata.tables)
+        print(self.schema)
+
+        self.metadata.reflect(self.engine, schema=self.schema,
+                              only=["arduino_in", "davis"])
 
         self.Base = automap_base(metadata=self.metadata)
+
+        for table in self.metadata.tables:
+            print(table)
+
         self.Base.prepare()
 
-        self.Vantage = self.Base.classes.davis
+        print(dir(self.Base.classes))
         self.ArduinoIn = self.Base.classes.arduino_in
+        self.Vantage = self.Base.classes.davis
 
         self.session = None
 

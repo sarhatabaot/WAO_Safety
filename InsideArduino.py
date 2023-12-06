@@ -31,7 +31,7 @@ class InsideArduinoMeasurement:
 
 class InsideArduino:
     def __init__(self):
-        with open(config_path, "r") as f:
+        with open(CONFIG_PATH, "r") as f:
             doc = tomlkit.load(f)
 
             com_port = doc["OutsideArduino"]["com_port"]
@@ -40,7 +40,7 @@ class InsideArduino:
             self.ser = serial.Serial(com_port, baud_rate)
 
     def _query(self, param_name: str):
-        self.ser.write(f"{param_name}?")
+        self.ser.write("{param_name}?".encode("utf-8"))
 
     @staticmethod
     def _parse_pressure(response: bytes) -> float:
