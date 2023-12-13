@@ -9,7 +9,7 @@ from VantagePro2 import VantagePro2, VantageProMeasurement
 from InsideArduino import InsideArduino, InsideArduinoMeasurement
 from db_access import DbManager
 
-db_manager = DbManager()
+# db_manager = DbManager()
 
 app = FastAPI()
 
@@ -65,25 +65,33 @@ class WeatherMonitor:
         self._davis_vantage = VantagePro2()
         self._inside_arduino = InsideArduino()
 
-    def make_measurements(self):
+    def make_measurements(self) -> None:
         self.make_arduino_measurement()
         self.make_vantage_measurement()
 
-    def make_arduino_measurement(self):
+    def make_arduino_measurement(self) -> None:
         with self._arduino_in_lock:
             measurement = self._inside_arduino.measure()
+
+        print("Made inside arduino measurement:")
+        print(measurement)
 
         if measurement is not None:
             with self._arduino_in_measurement_lock:
                 self._arduino_in_last_measurement = measurement
+                print("Updated inside arduino measurement")
 
     def make_vantage_measurement(self) -> None:
         with self._davis_vantage_lock:
             measurement = self._davis_vantage.measure()
 
+        print("Made davis measurement:")
+        print(measurement)
+
         if measurement is not None:
             with self._vantage_measurement_lock:
                 self._vantage_last_measurement = measurement
+                print("Updated davis measurement")
 
     def get_vantage_last_measurement(self):
         with self._vantage_measurement_lock:
@@ -98,31 +106,35 @@ weatherMonitor = WeatherMonitor()
 
 
 def monitor_weather():
+    print("MONITORING WEATHER")
     while True:
         weatherMonitor.make_measurements()
+
         save_vantage_measurement(weatherMonitor.get_vantage_last_measurement())
         save_arduino_in_measurement(weatherMonitor.get_arduino_in_last_measurement())
         time.sleep(30)
 
 
 def save_vantage_measurement(measurement):
-    db_manager.write_vantage_measurement(measurement)
+    # db_manager.write_vantage_measurement(measurement)
+    pass
 
 
 def save_arduino_in_measurement(measurement):
-    db_manager.write_arduino_in_measurement(measurement)
+    # db_manager.write_arduino_in_measurement(measurement)
+    pass
 
 
-@app.on_event("startup")
-async def startup():
-    db_manager.connect()
-    db_manager.open_session()
+# @app.on_event("startup")
+# async def startup():
+# db_manager.connect()
+# db_manager.open_session()
 
 
-@app.on_event("shutdown")
-async def shutdown():
-    db_manager.close_session()
-    db_manager.disconnect()
+# @app.on_event("shutdown")
+# async def shutdown():
+# db_manager.close_session()
+# db_manager.disconnect()
 
 
 thread = threading.Thread(target=monitor_weather)

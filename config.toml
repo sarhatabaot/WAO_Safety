@@ -1,6 +1,6 @@
 [VantagePro2]
 com_port = "/dev/ttyUSB0"
 baud_rate = 19200
-[OutsideArduino]
+[InsideArduino]
 com_port = "/dev/ttyUSB1"
 baud_rate = 115200

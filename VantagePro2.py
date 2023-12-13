@@ -1,7 +1,7 @@
 import serial
 from tomlkit import load
 import datetime
-
+from dataclasses import dataclass
 
 class UnitConverter:
     @staticmethod
@@ -15,21 +15,19 @@ class UnitConverter:
 
 CONFIG_PATH = "/home/ocs/python/security/WeatherSafety/config.toml"
 
-
+@dataclass
 class VantageProMeasurement:
     PacketLength = 99
     PacketDataLength = 97
 
-    def __init__(self, timestamp, barometer, temperature_in, temperature_out,
-                 humidity_in, humidity_out, wind_speed, wind_direction):
-        self.timestamp = timestamp
-        self.barometer = barometer
-        self.temperature_in = temperature_in
-        self.temperature_out = temperature_out
-        self.humidity_in = humidity_in
-        self.humidity_out = humidity_out
-        self.wind_speed = wind_speed
-        self.wind_direction = wind_direction
+    timestamp: datetime.datetime
+    pressure: float
+    temperature_in: float
+    temperature_out: float
+    humidity_in: int
+    humidity_out: int
+    wind_speed: float
+    wind_direction: int
 
     @classmethod
     def parse(cls, packet: bytes, timestamp: datetime.datetime):
@@ -39,8 +37,8 @@ class VantageProMeasurement:
         if not VantageProMeasurement.is_crc_correct(packet):
             return None
 
-        barometer_bytes = packet[7:9]
-        barometer = VantageProMeasurement._parse_barometer(barometer_bytes)
+        pressure_bytes = packet[7:9]
+        pressure = VantageProMeasurement._parse_barometer(pressure_bytes)
 
         temperature_in = VantageProMeasurement._parse_temperature(packet[9:11])
 
@@ -54,8 +52,14 @@ class VantageProMeasurement:
         wind_direction = int.from_bytes(packet[16:18], "little")
         humidity_out = packet[33]
 
-        return VantageProMeasurement(timestamp, barometer, temperature_in, temperature_out, humidity_in, humidity_out,
-                                     wind_speed, wind_direction)
+        return VantageProMeasurement(timestamp=timestamp,
+                                     pressure=pressure,
+                                     temperature_in=temperature_in,
+                                     temperature_out=temperature_out,
+                                     humidity_in=humidity_in,
+                                     humidity_out=humidity_out,
+                                     wind_speed=wind_speed,
+                                     wind_direction=wind_direction)
 
     @staticmethod
     def _parse_temperature(temp_bytes: bytes):
@@ -72,7 +76,7 @@ class VantageProMeasurement:
         crc = 0
 
         for i in range(len(packet)):
-            print("val = " + str((crc >> 8) ^ packet[i]))
+            # print("val = " + str((crc >> 8) ^ packet[i]))
             crc = VantageProMeasurement._crc_table[(crc >> 8) ^ packet[i]] ^ ((crc << 8) % (2 ** 16))
 
         return crc == 0
@@ -110,6 +114,10 @@ class VantageProMeasurement:
                   0xef1f, 0xff3e, 0xcf5d, 0xdf7c, 0xaf9b, 0xbfba, 0x8fd9, 0x9ff8,
                   0x6e17, 0x7e36, 0x4e55, 0x5e74, 0x2e93, 0x3eb2, 0xed1, 0x1ef0]
 
+    # def __str__(self) -> str:
+    #     print(f"VantageProMeasurement(pressure={self.barometer}, \
+    #           temperature_in={self.temperature_in}, humidity_in={self.humidity_in}, \
+    #           ")
 
 class VantagePro2:
     __wakeup_message = b"\n"
@@ -126,19 +134,16 @@ class VantagePro2:
         with open(CONFIG_PATH, "r") as f:
             doc = load(f)
             com_port = doc["VantagePro2"]["com_port"]
-            print(f"vantage com port: {com_port}")
             baud_rate = doc["VantagePro2"]["baud_rate"]
 
         self.ser = serial.Serial(com_port, baud_rate, timeout=2.0, parity=serial.PARITY_NONE)
 
-        print("connected to serial port")
 
     def wakeup(self):
         # start wakeup sequence
         for _ in range(VantagePro2.__wakeup_attempts):
             self.ser.write(b'\n')
             response = self.ser.read(VantagePro2.__wakeup_response_length)
-            print("got " + str(response))
             if len(response) == VantagePro2.__wakeup_response_length:
                 if VantagePro2.__is_valid_wakeup_response(response):
                     return True
@@ -146,10 +151,8 @@ class VantagePro2:
         return False
 
     def measure(self):
-        print("measurement requested")
 
         if not self.wakeup():
-            print("console sleeping")
             return None
 
         measurement = self.__send_loop()
