@@ -1,11 +1,12 @@
 from typing import Optional
 
-import sqlalchemy
 from sqlalchemy import create_engine, MetaData, Engine
 from sqlalchemy.ext.automap import automap_base
 from sqlalchemy.orm import Session
 import tomlkit
 
+from weather_measurement import WeatherMeasurement
+from weather_parameter import WeatherParameter
 CONFIG_PATH = "/home/ocs/python/security/WeatherSafety/db_config.toml"
 
 
@@ -30,6 +31,12 @@ def get_db_schema() -> str:
         return config_doc["database"]["schema"]
 
 
+Base = None
+DavisDbClass = None
+ArduinoInDbClass = None
+ArduinoOutDbClass = None
+
+
 class DbManager:
     def __init__(self):
         self.schema = get_db_schema()
@@ -47,27 +54,16 @@ class DbManager:
         self.Base = None
 
     def connect(self):
+        global Base, DavisDbClass, ArduinoInDbClass, ArduinoOutDbClass
+
         self.engine = create_engine(self.db_url)
-        print("engine")
-        self.metadata = MetaData()
-        print(self.metadata.tables)
-        print(self.schema)
 
-        self.metadata.reflect(self.engine, schema=self.schema,
-                              only=["arduino_in", "davis"])
+        Base = automap_base()
+        Base.prepare(autoload_with=self.engine, schema=self.schema)
 
-        self.Base = automap_base(metadata=self.metadata)
-
-        for table in self.metadata.tables:
-            print(table)
-
-        self.Base.prepare()
-
-        print(dir(self.Base.classes))
-        self.ArduinoIn = self.Base.classes.arduino_in
-        self.Vantage = self.Base.classes.davis
-
-        self.session = None
+        DavisDbClass = self.Base.classes.DavisDbClass
+        ArduinoInDbClass = self.Base.classes.ArduinoInDbClass
+        ArduinoOutDbClass = self.Base.classes.ArduinoOutDbClass
 
     def disconnect(self):
         self.engine.dispose()
@@ -78,24 +74,52 @@ class DbManager:
     def close_session(self):
         self.session.close()
 
-    def _convert_to_vantage_db_type(self, measurement):
-        return self.Vantage()
+    def write_vantage_measurement(self, measurement: WeatherMeasurement):
+        davis = DavisDbClass(
+            temp_in = measurement.get_parameter(WeatherParameter.TEMPERATURE_IN),
+            humidity_in = measurement.get_parameter(WeatherParameter.HUMIDITY_IN),
+            pressure_out = measurement.get_parameter(WeatherParameter.PRESSURE_OUT),
+            temp_out = measurement.get_parameter(WeatherParameter.TEMPERATURE_OUT),
+            humidity_out = measurement.get_parameter(WeatherParameter.HUMIDITY_OUT),
+            wind_speed = measurement.get_parameter(WeatherParameter.WIND_SPEED),
+            wind_direction = measurement.get_parameter(WeatherParameter.WIND_DIRECTION),
+            rain = measurement.get_parameter(WeatherParameter.RAIN),
+            solar_radiation = measurement.get_parameter(WeatherParameter.SOLAR_RADIATION),
+            tstamp = measurement.get_timestamp(),
+        )
 
-    def _convert_to_vantage_type(self, measurement):
-        pass
+        self.session.add(davis)
+        self.session.commit()
 
-    def _convert_to_arduino_in_db_type(self, measurement):
-        return self.ArduinoIn()
+    def write_arduino_in_measurement(self, measurement: WeatherMeasurement):
+        arduino_in = ArduinoInDbClass(
+            presence = measurement.get_parameter(WeatherParameter.PRESENCE),
+            temp_in = measurement.get_parameter(WeatherParameter.TEMPERATURE_IN),
+            pressure_in = measurement.get_parameter(WeatherParameter.PRESSURE_IN),
+            visible_lux_in = measurement.get_parameter(WeatherParameter.VISIBLE_LUX_IN),
+            flame = measurement.get_parameter(WeatherParameter.FLAME),
+            co2 = measurement.get_parameter(WeatherParameter.CO2),
+            voc = measurement.get_parameter(WeatherParameter.VOC),
+            raw_h2 = measurement.get_parameter(WeatherParameter.RAW_H2),
+            raw_ethanol = measurement.get_parameter(WeatherParameter.RAW_ETHANOL),
+            tstamp = measurement.get_timestamp()
+        )
 
-    def _convert_to_arduino_in_type(self, measurement):
-        pass
+        self.session.add(arduino_in)
+        self.session.commit()
 
-    def write_vantage_measurement(self, measurement):
-        # self.session.add(self._convert_to_vantage_db_type(measurement))
-        # self.session.flush()
-        pass
+    def write_arduino_out_measurement(self, measurement: WeatherMeasurement):
+        arduino_out = ArduinoOutDbClass(
+            temp_out = measurement.get_parameter(WeatherParameter.TEMPERATURE_OUT),
+            humidity_out = measurement.get_parameter(WeatherParameter.HUMIDITY_OUT),
+            pressure_out = measurement.get_parameter(WeatherParameter.PRESSURE_OUT),
+            dew_point = measurement.get_parameter(WeatherParameter.DEW_POINT),
+            visible_lux_out = measurement.get_parameter(WeatherParameter.VISIBLE_LUX_OUT),
+            ir_luminosity = measurement.get_parameter(WeatherParameter.IR_LUMINOSITY),
+            wind_speed = measurement.get_parameter(WeatherParameter.WIND_SPEED),
+            wind_direction = measurement.get_parameter(WeatherParameter.WIND_DIRECTION),
+            tstamp=measurement.get_timestamp()
+        )
 
-    def write_arduino_in_measurement(self, measurement):
-        # self.session.add(self._convert_to_arduino_in_db_type(measurement))
-        # self.session.flush()
-        pass
+        self.session.add(arduino_out)
+        self.session.commit()
