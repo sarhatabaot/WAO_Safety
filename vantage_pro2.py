@@ -179,17 +179,21 @@ class VantagePro2(SerialWeatherDevice):
         return measurement
 
     def check_right_port(self) -> bool:
+        print("checking if vantage is connected")
         # wakeup if sleeping
         if not self.__wakeup():
+            print("sleeping")
             return False
 
         # check test
         if not self.__test():
+            print("failed test")
             return False
 
         # check additional information
         # echo is not enough
         if not self.__wrd():
+            print("failed version")
             return False
 
         # definitely a VantagePro
@@ -202,16 +206,26 @@ class VantagePro2(SerialWeatherDevice):
         for _ in range(wakeup_attempts):
             self.ser.write(b"\n")
             response = self.ser.read(len(expected_response))
+            print(f"wakeup {response}")
+
             if response == expected_response:
+                print("woke up")
                 return True
 
         return False
 
     def __test(self):
+        # TODO: fix this
+        # self.ser.reset_output_buffer()
+
         expected_response = b"TEST\n\r"
         self.ser.write(b"TEST\n")
 
+        delim = self.ser.read(2)
         response = self.ser.read(len(expected_response))
+        # print(response)
+        print(f"test response: {response}")
+
         return response == expected_response
 
     def __wrd(self):

@@ -5,7 +5,6 @@ from collections import namedtuple
 import datetime
 from dataclasses import dataclass
 
-from main import WeatherMonitor
 from weather_measurement import WeatherMeasurement
 from weather_parameter import WeatherParameter
 
@@ -63,6 +62,7 @@ class InsideArduino(QueryWeatherArduino):
         data.update(self._measure_gas())
         data.update(self._measure_flame())
         data.update(self._measure_presence())
+        data.update(self._measure_light())
 
         return WeatherMeasurement(data)
 
@@ -72,14 +72,14 @@ class InsideArduino(QueryWeatherArduino):
         return {WeatherParameter.VISIBLE_LUX_IN: response[0]}
 
     def _measure_pressure(self):
-        response = self._send_and_parse_query("pressure", 0.1, "Pressure: {f} hPa")
+        response = self._send_and_parse_query("pressure", 0.1, "Pressure: {f}hPa")
 
-        return {WeatherParameter.PRESSURE_OUT: response[0]}
+        return {WeatherParameter.PRESSURE_IN: response[0]}
 
     def _measure_temperature(self):
         response = self._send_and_parse_query("temp", 0.1, "Temperature: {f}°C")
 
-        return {WeatherParameter.TEMPERATURE_OUT: response[0]}
+        return {WeatherParameter.TEMPERATURE_IN: response[0]}
 
     def _measure_gas(self):
         response = self._send_and_parse_query("gas", 0.07,

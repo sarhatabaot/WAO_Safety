@@ -61,9 +61,9 @@ class DbManager:
         Base = automap_base()
         Base.prepare(autoload_with=self.engine, schema=self.schema)
 
-        DavisDbClass = self.Base.classes.DavisDbClass
-        ArduinoInDbClass = self.Base.classes.ArduinoInDbClass
-        ArduinoOutDbClass = self.Base.classes.ArduinoOutDbClass
+        DavisDbClass = Base.classes.davis
+        ArduinoInDbClass = Base.classes.arduino_in
+        ArduinoOutDbClass = Base.classes.arduino_out
 
     def disconnect(self):
         self.engine.dispose()
