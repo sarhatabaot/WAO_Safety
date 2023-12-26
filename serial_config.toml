@@ -1,12 +1,12 @@
-[VantagePro2]
+[davis_vantage]
 active = true
 com_port = "/dev/ttyUSB0"
 baud_rate = 19200
-[InsideArduino]
+[arduino_in]
 active = true
 com_port = "/dev/ttyUSB1"
 baud_rate = 115200
-[OutsideArduino]
+[arduino_out]
 active = true
 com_port = "/dev/ttyACM0"
 baud_rate = 115200
