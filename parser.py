@@ -28,6 +28,11 @@ class Parser:
         delimiters: List[str] = []
         format_specifiers: List[str] = []
 
+        debug = False
+        if "TSL" in format_str:
+            print("REACHED HERE ####")
+            debug = True
+
         last_i = 0
 
         while last_i < len(format_str) and (
@@ -74,6 +79,9 @@ class Parser:
 
         remaining_response = response
 
+        if debug:
+            print(delimiters)
+
         i = 0
         for i in range(len(format_specifiers)):
             before = delimiters[i]
@@ -81,16 +89,19 @@ class Parser:
 
             before_index = remaining_response.find(before)
             if after != "":
-                after_index = remaining_response.find(after)
+                after_index = remaining_response.find(after, before_index + len(before))
 
                 if before_index != 0 or after_index == -1:
                     return None
 
                 str_to_parse = remaining_response[before_index + len(before): after_index]
-                remaining_response = remaining_response[after_index: ]
+                remaining_response = remaining_response[after_index:]
             else:
                 str_to_parse = remaining_response[before_index + len(before):]
                 remaining_response = ""
+
+            if debug:
+                print(f"goinig to parse: {str_to_parse}")
 
             value = Parser._parse_single(str_to_parse, format_specifiers[i])
 
@@ -100,7 +111,6 @@ class Parser:
             results.append(value)
 
         return tuple(results)
-
 
 # if __name__ == '__main__':
 #     print(Parser.parse("T: {f} C P: {i} hPa", "T: 22.3 C P: 1000 hPa"))

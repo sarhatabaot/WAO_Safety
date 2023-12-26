@@ -25,8 +25,11 @@ class QueryWeatherArduino(SerialWeatherDevice, ABC):
     def _send_and_parse_query(self, parma_name, wait: float, format_str: str) -> Tuple[Union[int, float]]:
         response = self._query(parma_name, wait)
         print("_send_and_parse_query!!!!")
-        print(f"!!!! format {format_str}")
-        print(f"!!!! response {response}")
+        print(f"!!!! format   : {format_str}|")
+        print(f"!!!! response : {response}|")
+
+        if "TSL" in format_str:
+            print("debug here")
 
         return Parser.parse(format_str, response)
 

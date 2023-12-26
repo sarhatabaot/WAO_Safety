@@ -13,8 +13,69 @@ from weather_device import WeatherDevice, DeviceName, DeviceType, get_device_typ
 from weather_measurement import WeatherMeasurement
 from weather_parameter import WeatherParameter
 
+import serial
+import tomlkit
 
 db_manager = DbManager()
+
+import vantage_pro2
+import inside_arduino
+import outside_arduino
+
+
+@staticmethod
+def connect_device(device_name: DeviceName):
+    config_name = SerialWeatherDevice._get_config_table_name(device_name)
+
+    print(f"Trying to connect {device_name}")
+
+    with open(SerialWeatherDevice._CONFIG_PATH, "r") as f:
+        doc = tomlkit.load(f)
+        default_port = doc[config_name]["com_port"]
+        baud_rate = doc[config_name]["baud_rate"]
+
+    print(f"port: {default_port}")
+    print(f"baud rate: {baud_rate}")
+
+    print(SerialWeatherDevice._free_ports)
+
+    if device_name == DeviceName.DAVIS_VANTAGE:
+        device = vantage_pro2.VantagePro2()
+    elif device_name == DeviceName.ARDUINO_IN:
+        device = inside_arduino.InsideArduino()
+    elif device_name == DeviceName.ARDUINO_OUT:
+        device = outside_arduino.OutsideArduino()
+    else:
+        return None
+
+    # there is a default port
+    if device_name != "":
+        # default port available
+        if SerialWeatherDevice._free_ports.get(default_port, False):
+            print("default port is free")
+            ser = serial.Serial(default_port, baud_rate)
+            device.set_port(ser)
+
+            # device connected
+            if device.check_right_port():
+                return device
+
+    # look for other port
+    for other_port in SerialWeatherDevice._free_ports:
+        # port is available
+        if other_port != default_port and SerialWeatherDevice._free_ports[other_port]:
+            ser = serial.Serial(default_port, baud_rate)
+            device.set_port(ser)
+
+            # device connected
+            if device.check_right_port():
+                return device
+
+    # can't connect device
+    return None
+
+
+SerialWeatherDevice.connect_device = connect_device
 
 
 @asynccontextmanager
@@ -22,6 +83,7 @@ async def lifespan(app: FastAPI):
     db_manager.connect()
     db_manager.open_session()
     init_monitoring()
+    continue_monitoring()
     yield
     db_manager.close_session()
     db_manager.disconnect()
@@ -48,10 +110,10 @@ async def get_raw_data():
     return weatherMonitor.get_all_measurement()
 
 
-@weatherRouter.get("measurements/{param}")
+@weatherRouter.get("/measurements/{param}")
 async def get_param(param: WeatherParameter):
     data = dict()
-    
+
     for device, measurement in weatherMonitor.get_all_measurement().items():
         value = measurement.get_parameter(param)
 
@@ -101,6 +163,7 @@ class WeatherMonitor:
                 device = SerialWeatherDevice.connect_device(device_name)
 
                 if device is not None:
+                    print(f"connected {device_name}")
                     self.active_devices[device_name] = device
 
     def make_measurements(self) -> None:
@@ -149,7 +212,6 @@ weatherMonitor = WeatherMonitor([DeviceName.DAVIS_VANTAGE, DeviceName.ARDUINO_IN
                                 {DeviceName.DAVIS_VANTAGE: save_vantage_measurement,
                                  DeviceName.ARDUINO_IN: save_arduino_in_measurement,
                                  DeviceName.ARDUINO_OUT: save_arduino_out_measurement})
-
 
 continue_loop_event = threading.Event()
 stay_alive_event = threading.Event()

@@ -43,21 +43,21 @@ class OutsideArduino(QueryWeatherArduino):
         return WeatherMeasurement(data)
 
     def _measure_wind(self):
-        wind_results = self._send_and_parse_query("wind", 0.05, "v= {f} m/s dir. {f}°")
+        wind_results = self._send_and_parse_query("wind", 0.05, "v={f} m/s  dir. {f}°")
 
         return {WeatherParameter.WIND_SPEED: wind_results[0],
                 WeatherParameter.WIND_DIRECTION: wind_results[1]}
 
     def _measure_light(self):
         light_results = self._send_and_parse_query("light", 0.08,
-                                                   "TSL vis(Lux) IR(luminosity): {i} {f}")
+                                                   "TSL vis(Lux) IR(luminosity): {i} {i}")
 
         return {WeatherParameter.VISIBLE_LUX_OUT: light_results[0],
                 WeatherParameter.IR_LUMINOSITY: light_results[1]}
 
     def _measure_pressure_humidity_temperature(self):
         results = self._send_and_parse_query("pht", 0.08,
-                                             "P: {f}hPa T: {f}°C RH: {f}% comp RH: {f}% dew point: {f}°C")
+                                             "P:{f}hPa T:{f}°C RH:{f}% comp RH:{f}% dew point:{f}°C")
 
         return {WeatherParameter.PRESSURE_OUT: results[0],
                 WeatherParameter.TEMPERATURE_OUT: results[1],
