@@ -63,6 +63,7 @@ class DeviceFactory:
         if device_name not in DeviceFactory.SERIAL_DEVICES:
             return None
 
+        print(f" * DeviceFactory.connect_serial_device * creating {device_name}")
         config_name = device_name.value
 
         # print(f"Trying to connect {device_name}")
@@ -90,13 +91,16 @@ class DeviceFactory:
         if device_name != "":
             # default port available
             if DeviceFactory._free_serial_ports.get(default_port, False):
-                # print("default port is free")
+                print(f" * DeviceFactory.connect_serial_device * default port {default_port} is free")
                 ser = serial.Serial(default_port, baud_rate)
                 device.set_port(ser)
 
                 # device connected
                 if device.check_right_port():
+                    print(" * DeviceFactory.connect_serial_device * rigth port")
                     return device
+
+                print(" * DeviceFactory.connect_serial_device * wrong port")
 
         # look for other port
         for other_port in DeviceFactory._free_serial_ports:
@@ -104,10 +108,15 @@ class DeviceFactory:
             if other_port != default_port and DeviceFactory._free_serial_ports[other_port]:
                 ser = serial.Serial(default_port, baud_rate)
                 device.set_port(ser)
+                print(f" * DeviceFactory.connect_serial_device * trying free port {default_port}")
+
 
                 # device connected
                 if device.check_right_port():
+                    print(" * DeviceFactory.connect_serial_device * rigth port")
                     return device
+
+                print(" * DeviceFactory.connect_serial_device * wrong port")
 
         # can't connect device
         return None

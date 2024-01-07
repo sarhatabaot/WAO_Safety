@@ -5,4 +5,4 @@ active = true
 [arduino_out]
 active = true
 [sun_elevation_calculator]
-actice = false
+active = false

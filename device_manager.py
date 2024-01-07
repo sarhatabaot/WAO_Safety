@@ -13,16 +13,27 @@ class DeviceManager:
                  save_callback: callable):
         self.device = device
 
+        self.interval = config.interval
+
         self._queue = list()
         self.queue_size = config.queue_size
-        self._queue_lock = Lock()
 
-        self.interval = config.interval
+        print(f" * DeviceManager.__init__ * interval={self.interval} queue_size={self.queue_size}")
+        self._queue_lock = Lock()
 
         self._stop_event = Event()
         self._save_callback = save_callback
 
+        # TODO: remove this. this is not supposed to happens
+        if self.interval == 0:
+            self.interval = 60
+
+        if self.queue_size == 0:
+            self.queue_size = 1
+        
     def _measuring_loop(self):
+        print(f"* DeviceManager._measuring_loop * started measuring")
+
         while not self._stop_event.is_set():
             start_time = time.time()
             measurement = self.device.measure_all()
@@ -43,6 +54,8 @@ class DeviceManager:
             # sleep until an interval elapsed
             remaining_time = self.interval - (end_time - start_time)
             time.sleep(remaining_time)
+
+        print(f"* DeviceManager._measuring_loop * finished measuring")
 
     def start_measuring(self):
         # start making measurements in a separate thread

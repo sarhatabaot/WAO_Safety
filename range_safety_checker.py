@@ -47,7 +47,7 @@ class ParameterConfig:
 
 
 class DeviceMeasuringConfig:
-    def __init__(self, interval=None, queue_size=None):
+    def __init__(self, interval=60, queue_size=1):
         self.interval = interval
         self.queue_size = queue_size
 
@@ -171,7 +171,7 @@ class RangeSafetyChecker(SafetyChecker):
             project_config = self.projects_configs[project]
 
             for param, config in project_config.items():
-                if config.source == device_name:
+                if config.source == device_name and config.interval is not None:
                     min_interval = min(min_interval, config.interval)
 
         return min_interval if min_interval != 100000 else 0
@@ -192,7 +192,7 @@ class RangeSafetyChecker(SafetyChecker):
             project_config = self.projects_configs[project]
 
             for param, config in project_config.items():
-                if config.source == device_name:
+                if config.source == device_name and config.total_time is not None:
                     max_time = max(max_time, config.total_time)
 
         return int(max_time / interval) if max_time != -1 else 0

@@ -18,7 +18,13 @@ class QueryWeatherArduino(SerialWeatherDevice, ABC):
         super().__init__(ser)
 
     def _query(self, param_name: str, wait: float) -> str:
+        self.ser.reset_input_buffer()
+        self.ser.reset_output_buffer()
+
         request_txt = f"{param_name}?\r\n"
+
+        print(f" * QueryWeatherArduino._query * sending {request_txt}")
+
         self.ser.write(request_txt.encode("utf-8"))
         time.sleep(wait)
 
@@ -35,9 +41,6 @@ class QueryWeatherArduino(SerialWeatherDevice, ABC):
         print(f"!!!! format   : {format_str}|")
         print(f"!!!! response : {response}|")
 
-        if "TSL" in format_str:
-            print("debug here")
-
         return Parser.parse(format_str, response)
 
     @abstractmethod
@@ -45,9 +48,10 @@ class QueryWeatherArduino(SerialWeatherDevice, ABC):
         pass
 
     def check_right_port(self) -> bool:
-        print("checking if arduino is connected correctly")
+        print(" * QueryWeatherArduino.check_right_port * checking if arduino is connected correctly")
         response = self._query("id", 0.5)
-        print(response)
+        print(f" * QueryWeatherArduino.check_right_port * recieved {response}")
+        
 
         return self.get_correct_file() in response
 

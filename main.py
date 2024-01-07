@@ -1,5 +1,5 @@
 from typing import Dict, List
-
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, APIRouter
 
 from device_manager import DeviceManager
@@ -16,8 +16,21 @@ from range_safety_checker import RangeSafetyChecker
 
 db_manager = DbManager()
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app):
+    print(" * lifespan * connect database")
+    db_manager.connect()
+    print(" * lifespan * open session")
+    db_manager.open_session()
+    print(" * lifespan * start measuring")
+    weather_monitor.start_measuring()
+    print(" * lifespan * start")
+    yield
+    weather_monitor.stop_measuring()
+    db_manager.close_session()
+    db_manager.disconnect()
 
+app = FastAPI(lifespan=lifespan)
 
 @app.get("/")
 async def root():
@@ -87,13 +100,14 @@ class WeatherMonitor:
             if device is not None:
                 print(f"initialized {device_name}")
 
-                measuring_config = safety_checker.get_measuring_config(device_name)
+                measuring_config = safety_checker.get_device_measuring_config(device_name)
                 device_manager = DeviceManager(device, measuring_config, self.saving.get(device_name))
 
                 self.active_device_managers[device_name] = device_manager
 
     def start_measuring(self):
-        for device_manager in self.active_device_managers.values():
+        for device, device_manager in self.active_device_managers.items():
+            print(f" * WeatherMonitor.start_measuring * trying to make {device} start measuring")
             device_manager.start_measuring()
 
     def stop_measuring(self):
