@@ -1,95 +1,22 @@
-import time
-import threading
-from enum import Enum
 from typing import Dict, List
-from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, APIRouter
 
-from serial_weather_device import SerialWeatherDevice
+from device_manager import DeviceManager
+from device_factory import DeviceFactory, DeviceType
+from project import Project
 from db_access import DbManager
-from weather_device import WeatherDevice, DeviceName, DeviceType, get_device_type
+# from weather_device import WeatherDevice
+from device_name import DeviceName
 
 from weather_measurement import WeatherMeasurement
 from weather_parameter import WeatherParameter
 
-import serial
-import tomlkit
+from range_safety_checker import RangeSafetyChecker
 
 db_manager = DbManager()
 
-import vantage_pro2
-import inside_arduino
-import outside_arduino
-
-
-@staticmethod
-def connect_device(device_name: DeviceName):
-    config_name = SerialWeatherDevice._get_config_table_name(device_name)
-
-    print(f"Trying to connect {device_name}")
-
-    with open(SerialWeatherDevice._CONFIG_PATH, "r") as f:
-        doc = tomlkit.load(f)
-        default_port = doc[config_name]["com_port"]
-        baud_rate = doc[config_name]["baud_rate"]
-
-    print(f"port: {default_port}")
-    print(f"baud rate: {baud_rate}")
-
-    print(SerialWeatherDevice._free_ports)
-
-    if device_name == DeviceName.DAVIS_VANTAGE:
-        device = vantage_pro2.VantagePro2()
-    elif device_name == DeviceName.ARDUINO_IN:
-        device = inside_arduino.InsideArduino()
-    elif device_name == DeviceName.ARDUINO_OUT:
-        device = outside_arduino.OutsideArduino()
-    else:
-        return None
-
-    # there is a default port
-    if device_name != "":
-        # default port available
-        if SerialWeatherDevice._free_ports.get(default_port, False):
-            print("default port is free")
-            ser = serial.Serial(default_port, baud_rate)
-            device.set_port(ser)
-
-            # device connected
-            if device.check_right_port():
-                return device
-
-    # look for other port
-    for other_port in SerialWeatherDevice._free_ports:
-        # port is available
-        if other_port != default_port and SerialWeatherDevice._free_ports[other_port]:
-            ser = serial.Serial(default_port, baud_rate)
-            device.set_port(ser)
-
-            # device connected
-            if device.check_right_port():
-                return device
-
-    # can't connect device
-    return None
-
-
-SerialWeatherDevice.connect_device = connect_device
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    db_manager.connect()
-    db_manager.open_session()
-    init_monitoring()
-    continue_monitoring()
-    yield
-    db_manager.close_session()
-    db_manager.disconnect()
-
-
-app = FastAPI(lifespan=lifespan)
+app = FastAPI()
 
 
 @app.get("/")
@@ -97,103 +24,91 @@ async def root():
     return {"message": "Hello World"}
 
 
-@app.get("/hello/{name}")
-async def say_hello(name: str):
-    return {"message": f"Hello {name}"}
+weather_router = APIRouter(prefix="/weather")
 
 
-weatherRouter = APIRouter(prefix="/weather")
-
-
-@weatherRouter.get("/raw_data")
+@weather_router.get("/raw_data")
 async def get_raw_data():
-    return weatherMonitor.get_all_measurement()
+    return weather_monitor.get_all_measurements()
 
 
-@weatherRouter.get("/measurements/{param}")
+@weather_router.get("/measurements/{param}")
 async def get_param(param: WeatherParameter):
     data = dict()
 
-    for device, measurement in weatherMonitor.get_all_measurement().items():
-        value = measurement.get_parameter(param)
+    for device, measurements in weather_monitor.get_all_measurements().items():
+        last_measurement = measurements[-1]
+        value = last_measurement.get_parameter(param)
 
         if value is not None:
-            data[device] = {param: value, "timestamp": measurement.get_timestamp()}
+            data[device] = {param: value, "timestamp": last_measurement.get_timestamp()}
 
     return data
 
 
-class Project(str, Enum):
-    Last = "last"
-    Mast = "mast"
+safety_router = APIRouter(prefix="/safety_config")
 
 
-safetyRouter = APIRouter(prefix="/safety")
-
-
-@safetyRouter.get("/{project}")
+@safety_router.get("/{project}")
 async def get_safety(project: Project):
-    return {"is_safe": True}
+
+    return {"is_safe": range_safety_checker.is_safe(project,
+                                                    weather_monitor.get_all_measurements())}
 
 
-app.include_router(weatherRouter)
-app.include_router(safetyRouter)
+app.include_router(weather_router)
+app.include_router(safety_router)
 
 control_router = APIRouter(prefix="/control")
 
 
 @control_router.get("/devices")
 async def list_devices():
-    return weatherMonitor.list_active_devices()
+    return weather_monitor.list_active_devices()
 
 
 class WeatherMonitor:
     def __init__(self,
                  device_names: List[DeviceName],
-                 saving: Dict[DeviceName, callable] = None):
+                 saving: Dict[DeviceName, callable] = None,
+                 safety_checker=None):
+
         self.saving = saving
-
-        self.active_devices: Dict[DeviceName, WeatherDevice] = dict()
-
-        self.last_measurements_lock = threading.Lock()
-        self.last_measurements: Dict[DeviceName, WeatherMeasurement] = dict()
+        self.active_device_managers: Dict[DeviceName, DeviceManager] = dict()
 
         for device_name in device_names:
-            if get_device_type(device_name) == DeviceType.SERIAL:
-                device = SerialWeatherDevice.connect_device(device_name)
+            if DeviceFactory.get_device_type(device_name) == DeviceType.SERIAL:
+                device = DeviceFactory.connect_serial_device(device_name)
+            elif DeviceFactory.get_device_type(device_name) == DeviceType.CALCULATION:
+                device = DeviceFactory.create_calculation_device(device_name)
+            else:
+                device = None
 
-                if device is not None:
-                    print(f"connected {device_name}")
-                    self.active_devices[device_name] = device
+            if device is not None:
+                print(f"initialized {device_name}")
 
-    def make_measurements(self) -> None:
-        for device_name, device in self.active_devices.items():
-            measurement = device.measure_all()
+                measuring_config = safety_checker.get_measuring_config(device_name)
+                device_manager = DeviceManager(device, measuring_config, self.saving.get(device_name))
 
-            with self.last_measurements_lock:
-                self.last_measurements[device_name] = measurement
+                self.active_device_managers[device_name] = device_manager
 
-            print(f"Made {device_name} measurement:")
-            print(measurement)
+    def start_measuring(self):
+        for device_manager in self.active_device_managers.values():
+            device_manager.start_measuring()
 
-    def save_measurements(self):
-        if self.saving is not None:
-            with self.last_measurements_lock:
-                for device_name, save_function in self.saving.items():
-                    measurement = self.last_measurements.get(device_name)
-
-                    if measurement is not None:
-                        save_function(measurement)
+    def stop_measuring(self):
+        for device_manager in self.active_device_managers.values():
+            device_manager.stop_measuring()
 
     def list_active_devices(self):
-        return list(self.active_devices.keys())
+        return list(self.active_device_managers.keys())
 
-    def get_last_measurement(self, device: DeviceName):
-        with self.last_measurements_lock:
-            return self.last_measurements.get(device)
+    def get_all_measurements(self) -> Dict[DeviceName, List[WeatherMeasurement]]:
+        data = dict()
+        for device, manager in self.active_device_managers.items():
+            data[device] = manager.get_last_measurements()
 
-    def get_all_measurement(self) -> Dict[DeviceName, WeatherMeasurement]:
-        return self.last_measurements.copy()
+        return data
 
 
 def save_vantage_measurement(measurement):
@@ -208,44 +123,14 @@ def save_arduino_out_measurement(measurement):
     db_manager.write_arduino_out_measurement(measurement)
 
 
-weatherMonitor = WeatherMonitor([DeviceName.DAVIS_VANTAGE, DeviceName.ARDUINO_IN, DeviceName.ARDUINO_OUT],
-                                {DeviceName.DAVIS_VANTAGE: save_vantage_measurement,
-                                 DeviceName.ARDUINO_IN: save_arduino_in_measurement,
-                                 DeviceName.ARDUINO_OUT: save_arduino_out_measurement})
+ALL_SAVING_FUNCTIONS = {DeviceName.DAVIS_VANTAGE: save_vantage_measurement,
+                        DeviceName.ARDUINO_IN: save_arduino_in_measurement,
+                        DeviceName.ARDUINO_OUT: save_arduino_out_measurement,
+                        DeviceName.SUN_ELEVATION_CALCULATOR: None}
 
-continue_loop_event = threading.Event()
-stay_alive_event = threading.Event()
+active_devices = DeviceFactory.get_active_devices()
+saving_functions = {device: function for device, function in ALL_SAVING_FUNCTIONS.items()
+                    if device in active_devices}
 
-
-def monitor_weather(dont_pause: threading.Event, dont_stop: threading):
-    while dont_stop.is_set():
-        print("MONITORING")
-        while dont_pause.wait():
-            weatherMonitor.make_measurements()
-            weatherMonitor.save_measurements()
-
-            time.sleep(30)
-
-        print("MONITORING PAUSED")
-
-    print("MONITORING KILLED")
-
-
-def init_monitoring():
-    continue_loop_event.clear()
-    stay_alive_event.set()
-
-    thread = threading.Thread(target=monitor_weather, args=(continue_loop_event, stay_alive_event))
-    thread.start()
-
-
-def continue_monitoring():
-    continue_loop_event.set()
-
-
-def pause_monitoring():
-    continue_loop_event.clear()
-
-
-def kill_monitoring():
-    stay_alive_event.clear()
+range_safety_checker = RangeSafetyChecker()
+weather_monitor = WeatherMonitor(active_devices, saving_functions, range_safety_checker)

@@ -13,12 +13,12 @@ class Parser:
                 return value
             else:
                 return None
-        except:
+        except ValueError:
             return None
 
     @staticmethod
     def parse(format_str: str, response: str):
-        # TODO: dangerous code. make enter infinite loop
+        # TODO: dangerous code. can enter infinite loop
         """
         Limitations: Must be only one way to parse to string
         :param format_str:
@@ -82,7 +82,6 @@ class Parser:
         if debug:
             print(delimiters)
 
-        i = 0
         for i in range(len(format_specifiers)):
             before = delimiters[i]
             after = delimiters[i + 1]
@@ -101,7 +100,7 @@ class Parser:
                 remaining_response = ""
 
             if debug:
-                print(f"goinig to parse: {str_to_parse}")
+                print(f"going to parse: {str_to_parse}")
 
             value = Parser._parse_single(str_to_parse, format_specifiers[i])
 
@@ -111,7 +110,3 @@ class Parser:
             results.append(value)
 
         return tuple(results)
-
-# if __name__ == '__main__':
-#     print(Parser.parse("T: {f} C P: {i} hPa", "T: 22.3 C P: 1000 hPa"))
-#     print(Parser.parse("hello {s} and {s}, guys", "hello yakov and yaron, guys"))

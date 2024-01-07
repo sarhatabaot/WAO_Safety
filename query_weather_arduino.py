@@ -3,10 +3,17 @@ from abc import ABC, abstractmethod
 from typing import Tuple, Union
 
 from serial_weather_device import SerialWeatherDevice
-from parser import Parser
+from my_parser import Parser
 
 
 class QueryWeatherArduino(SerialWeatherDevice, ABC):
+    """
+    This is a base class for several similar Arduino devices.
+    All devices that inherit from this class are devices with this API:
+
+    PC: <measurement name>?
+    ARDUINO: <some text><value 1><some text><value 2><some text>
+    """
     def __init__(self, ser):
         super().__init__(ser)
 

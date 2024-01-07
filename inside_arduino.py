@@ -1,36 +1,8 @@
-import serial
-import tomlkit
-from typing import Tuple, Optional, Union, Dict, List
-from collections import namedtuple
-import datetime
-from dataclasses import dataclass
-
-from weather_measurement import WeatherMeasurement
-from weather_parameter import WeatherParameter
+from typing import Optional, Union, List
 
 from query_weather_arduino import QueryWeatherArduino
-CONFIG_PATH = "/home/ocs/python/security/WeatherSafety/serial_config.toml"
-
-
-@dataclass
-class GasMeasurement:
-    co2: int
-    voc: int
-    raw_h2: int
-    raw_ethanol: int
-
-
-@dataclass
-class InsideArduinoMeasurement:
-    timestamp: datetime.datetime
-    pressure: float
-    temperature: float
-    co2: int
-    voc: int
-    raw_h2: int
-    raw_ethanol: int
-    flame: int
-    presence: bool
+from weather_measurement import WeatherMeasurement
+from weather_parameter import WeatherParameter
 
 
 class InsideArduino(QueryWeatherArduino):
@@ -96,7 +68,6 @@ class InsideArduino(QueryWeatherArduino):
         return {WeatherParameter.FLAME: response[0]}
 
     def _measure_presence(self):
-        response = self._send_and_parse_query("presence", 0.05,"Presence: {i}")
+        response = self._send_and_parse_query("presence", 0.05, "Presence: {i}")
 
         return {WeatherParameter.PRESENCE: response[0]}
-

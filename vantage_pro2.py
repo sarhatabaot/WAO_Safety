@@ -18,9 +18,6 @@ class UnitConverter:
         return speed_mph / 1.60934
 
 
-CONFIG_PATH = "/home/ocs/python/security/WeatherSafety/serial_config.toml"
-
-
 class LoopPacket:
     PacketLength = 99
     PacketDataLength = 97
@@ -221,7 +218,7 @@ class VantagePro2(SerialWeatherDevice):
         expected_response = b"TEST\n\r"
         self.ser.write(b"TEST\n")
 
-        delim = self.ser.read(2)
+        self.ser.read(2)
         response = self.ser.read(len(expected_response))
         # print(response)
         print(f"test response: {response}")

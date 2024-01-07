@@ -1,0 +1,6 @@
+[temperature_in]
+min = 10.0 # degrees C
+max = 90.0 # degrees C
+source = "arduino_in"
+
+

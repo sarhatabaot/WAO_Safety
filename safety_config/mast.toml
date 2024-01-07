@@ -1,0 +1,4 @@
+[temperature_out]
+min = 5.0 # degres C
+max = 95.0 # degrees C
+source = "arduino_out"

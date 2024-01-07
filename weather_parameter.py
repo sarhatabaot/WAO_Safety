@@ -30,3 +30,5 @@ class WeatherParameter(str, Enum):
     RAW_ETHANOL = "raw_ethanol",
 
     DEW_POINT = "dew_point"
+
+    SUN_ELEVATION = "sun_elevation"
