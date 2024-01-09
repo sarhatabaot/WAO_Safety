@@ -64,9 +64,16 @@ class RangeSafetyChecker(SafetyChecker):
         self._device_measuring_config: Dict[DeviceName, DeviceMeasuringConfig] = dict()
         self._init_all_devices_config()
 
-    def _read_config(self, folder_name):
+    def _read_config(self, folder_name) -> None:
+        """
+        Read all configurations
+        :param folder_name: name of folder where the files are located
+        """
+
+        # Read the default config
         default_config = RangeSafetyChecker._parse_config(os.path.join(folder_name, RangeSafetyChecker.DEFAULT))
 
+        # for each project, update the config according to the project file
         for project_str in Project:
             project = Project(project_str)
 
@@ -88,6 +95,11 @@ class RangeSafetyChecker(SafetyChecker):
 
     @staticmethod
     def _parse_config(filename: str):
+        """
+        Reads a config file and returns the configs found in it
+        :param filename: filename of the config file
+        :return: Dictionary of the configurations found in the file
+        """
         parameters_config = dict()
 
         with open(filename, "r") as fp:

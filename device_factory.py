@@ -63,20 +63,12 @@ class DeviceFactory:
         if device_name not in DeviceFactory.SERIAL_DEVICES:
             return None
 
-        print(f" * DeviceFactory.connect_serial_device * creating {device_name}")
         config_name = device_name.value
-
-        # print(f"Trying to connect {device_name}")
 
         with open(DeviceFactory.SERIAL_CONFIG_PATH, "r") as f:
             doc = tomlkit.load(f)
             default_port = doc[config_name]["com_port"]
             baud_rate = doc[config_name]["baud_rate"]
-
-        # print(f"port: {default_port}")
-        # print(f"baud rate: {baud_rate}")
-
-        # print(DeviceFactory.SERIAL_CONFIG_PATH)
 
         if device_name == DeviceName.DAVIS_VANTAGE:
             device = VantagePro2()
@@ -91,16 +83,12 @@ class DeviceFactory:
         if device_name != "":
             # default port available
             if DeviceFactory._free_serial_ports.get(default_port, False):
-                print(f" * DeviceFactory.connect_serial_device * default port {default_port} is free")
                 ser = serial.Serial(default_port, baud_rate)
                 device.set_port(ser)
 
                 # device connected
                 if device.check_right_port():
-                    print(" * DeviceFactory.connect_serial_device * rigth port")
                     return device
-
-                print(" * DeviceFactory.connect_serial_device * wrong port")
 
         # look for other port
         for other_port in DeviceFactory._free_serial_ports:
@@ -108,15 +96,10 @@ class DeviceFactory:
             if other_port != default_port and DeviceFactory._free_serial_ports[other_port]:
                 ser = serial.Serial(default_port, baud_rate)
                 device.set_port(ser)
-                print(f" * DeviceFactory.connect_serial_device * trying free port {default_port}")
-
 
                 # device connected
                 if device.check_right_port():
-                    print(" * DeviceFactory.connect_serial_device * rigth port")
                     return device
-
-                print(" * DeviceFactory.connect_serial_device * wrong port")
 
         # can't connect device
         return None
@@ -141,6 +124,7 @@ class DeviceFactory:
                 table = doc[config_name]
                 parameters = table["param"]
 
+                # specific data for this device
                 longitude = parameters["longitude"]
                 latitude = parameters["latitude"]
                 height = parameters["height"]
@@ -153,6 +137,10 @@ class DeviceFactory:
 
     @staticmethod
     def get_active_devices():
+        """
+        Checks which devices marked in the configurations as active
+        :return: list of devices that are supposed to be active
+        """
         devices = list()
 
         with open(DeviceFactory.ACTIVE_DEVICES_CONFIG_PATH, "r") as fp:

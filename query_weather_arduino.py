@@ -18,40 +18,57 @@ class QueryWeatherArduino(SerialWeatherDevice, ABC):
         super().__init__(ser)
 
     def _query(self, param_name: str, wait: float) -> str:
+        """
+        This function sends a request from the arduino, sleeps some time and
+        then reads the response
+        :param param_name:
+        :param wait: time to sleep
+        :return: arduino response
+        """
         self.ser.reset_input_buffer()
         self.ser.reset_output_buffer()
 
         request_txt = f"{param_name}?\r\n"
 
-        print(f" * QueryWeatherArduino._query * sending {request_txt}")
-
         self.ser.write(request_txt.encode("utf-8"))
         time.sleep(wait)
 
-        response_txt =  self.ser.readline().decode("utf-8")
+        response_txt = self.ser.readline().decode("utf-8")
 
+        # TODO: Find reason for echo
         while response_txt == request_txt:
-            response_txt =  self.ser.readline().decode("utf-8")
+            response_txt = self.ser.readline().decode("utf-8")
 
         return response_txt
 
     def _send_and_parse_query(self, parma_name, wait: float, format_str: str) -> Tuple[Union[int, float]]:
+        """
+        Sends a request and returns the values in the request.
+        All the arduino responses are in the format of: <some text><value><some text><value 2><some text>.
+        :param parma_name: name of query
+        :param wait: time to sleep
+        :param format_str: format of the response. See Parser documentation for details.
+        :return: A tuple contaminating the values from the response
+        """
         response = self._query(parma_name, wait)
-        print("_send_and_parse_query!!!!")
-        print(f"!!!! format   : {format_str}|")
-        print(f"!!!! response : {response}|")
 
         return Parser.parse(format_str, response)
 
     @abstractmethod
     def get_correct_file(self) -> str:
+        """
+        :return: the name of the file where the arduino code is written.
+        Different types of arduinos have different file names.
+        """
         pass
 
     def check_right_port(self) -> bool:
-        print(" * QueryWeatherArduino.check_right_port * checking if arduino is connected correctly")
+        """
+        All arduinos have an "id?" command that returns compilation details, including their file name.
+        I check if the right filename is in the response
+        :return: True iff the right arduino is connected
+        """
         response = self._query("id", 0.5)
-        print(f" * QueryWeatherArduino.check_right_port * recieved {response}")
-        
 
         return self.get_correct_file() in response
 

@@ -5,6 +5,10 @@ from weather_parameter import WeatherParameter
 
 
 class WeatherMeasurement:
+    """
+    A class that contains a weather measurement of a device -
+    a device measures in a short time all the parameters
+    """
     def __init__(self, measured_parameters: Dict[WeatherParameter, Union[int, float]], timestamp: datetime = None):
         self.measured_parameters: Dict = measured_parameters
 

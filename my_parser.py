@@ -20,18 +20,14 @@ class Parser:
     def parse(format_str: str, response: str):
         # TODO: dangerous code. can enter infinite loop
         """
+        Tries to extract values from a string created using formatting.
         Limitations: Must be only one way to parse to string
-        :param format_str:
-        :param response:
-        :return:
+        :param format_str: format string with only. For example 'Int Value {i} Float Value {f}'.
+        :param response: text to parse
+        :return: values extracted from the response.
         """
         delimiters: List[str] = []
         format_specifiers: List[str] = []
-
-        debug = False
-        if "TSL" in format_str:
-            print("REACHED HERE ####")
-            debug = True
 
         last_i = 0
 
@@ -79,9 +75,6 @@ class Parser:
 
         remaining_response = response
 
-        if debug:
-            print(delimiters)
-
         for i in range(len(format_specifiers)):
             before = delimiters[i]
             after = delimiters[i + 1]
@@ -98,9 +91,6 @@ class Parser:
             else:
                 str_to_parse = remaining_response[before_index + len(before):]
                 remaining_response = ""
-
-            if debug:
-                print(f"going to parse: {str_to_parse}")
 
             value = Parser._parse_single(str_to_parse, format_specifiers[i])
 

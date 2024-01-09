@@ -1,7 +1,9 @@
 from weather_device import WeatherDevice
 from threading import Event, Thread, Lock
+from typing import List
 import time
 from range_safety_checker import DeviceMeasuringConfig
+from weather_measurement import WeatherMeasurement
 
 
 class DeviceManager:
@@ -15,25 +17,27 @@ class DeviceManager:
 
         self.interval = config.interval
 
-        self._queue = list()
+        self._queue: List[WeatherMeasurement] = list()
         self.queue_size = config.queue_size
 
-        print(f" * DeviceManager.__init__ * interval={self.interval} queue_size={self.queue_size}")
         self._queue_lock = Lock()
 
         self._stop_event = Event()
         self._save_callback = save_callback
 
-        # TODO: remove this. this is not supposed to happens
+        # TODO: check when it is a bug and when it is not
         if self.interval == 0:
             self.interval = 60
 
         if self.queue_size == 0:
             self.queue_size = 1
         
-    def _measuring_loop(self):
-        print(f"* DeviceManager._measuring_loop * started measuring")
-
+    def _measuring_loop(self) -> None:
+        """
+        This function is blocking, so it is must be called in a separate thread.
+        Measures every time interval and updates the measurements queue.
+        If there is a saving callback, save the measurement
+        """
         while not self._stop_event.is_set():
             start_time = time.time()
             measurement = self.device.measure_all()
@@ -55,20 +59,28 @@ class DeviceManager:
             remaining_time = self.interval - (end_time - start_time)
             time.sleep(remaining_time)
 
-        print(f"* DeviceManager._measuring_loop * finished measuring")
-
-    def start_measuring(self):
+    def start_measuring(self) -> None:
+        """
+        Start measuring loop in another thread
+        """
         # start making measurements in a separate thread
         self._stop_event.clear()
 
         thread = Thread(target=self._measuring_loop)
         thread.start()
 
-    def stop_measuring(self):
+    def stop_measuring(self) -> None:
+        """
+        Stops the measuring loop if running
+        """
         # stop the thread making the measurements
         self._stop_event.clear()
 
-    def get_last_measurements(self):
+    def get_last_measurements(self) -> List[WeatherMeasurement]:
+        """
+        Copies the measurements queue
+        :return: List of last measurements
+        """
         # get all measurements
         with self._queue_lock:
             return self._queue.copy()
