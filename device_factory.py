@@ -14,6 +14,8 @@ import tomlkit
 import serial
 import serial.tools.list_ports
 
+from utils import cfg
+
 
 class DeviceType(str, Enum):
     SERIAL = "serial"
@@ -143,13 +145,19 @@ class DeviceFactory:
         """
         devices = list()
 
-        with open(DeviceFactory.ACTIVE_DEVICES_CONFIG_PATH, "r") as fp:
-            doc = tomlkit.load(fp)
+        # with open(DeviceFactory.ACTIVE_DEVICES_CONFIG_PATH, "r") as fp:
+        #     doc = tomlkit.load(fp)
+        #
+        #     for device_str in DeviceName:
+        #         # device is active
+        #         if doc[device_str]["active"]:
+        #             device = DeviceName(device_str)
+        #             devices.append(device)
 
-            for device_str in DeviceName:
-                # device is active
-                if doc[device_str]["active"]:
-                    device = DeviceName(device_str)
-                    devices.append(device)
+        stations = cfg.data['stations'].keys()
+        for station in stations:
+            enabled = cfg.data['stations'][station]['enabled']
+            if enabled:
+                devices.append(station)
 
         return devices

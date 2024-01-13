@@ -7,29 +7,33 @@ import tomlkit
 
 from weather_measurement import WeatherMeasurement
 from weather_parameter import WeatherParameter
+from utils import cfg
 
 CONFIG_PATH = "/home/ocs/python/security/WeatherSafety/db_config.toml"
 
 
 def get_db_url() -> str:
-    with open(CONFIG_PATH, "r") as config_fp:
-        config_doc = tomlkit.load(config_fp)
-
-        db_host = config_doc["database"]["host"]
-
-        db_user = config_doc["database"]["user"]
-        db_password = config_doc["database"]["password"]
-
-        db_name = config_doc["database"]["name"]
-
-        return f"postgresql+psycopg2://{db_user}:{db_password}@{db_host}/{db_name}"
+    # with open(CONFIG_PATH, "r") as config_fp:
+    #     config_doc = tomlkit.load(config_fp)
+    #
+    #     db_host = config_doc["database"]["host"]
+    #
+    #     db_user = config_doc["database"]["user"]
+    #     db_password = config_doc["database"]["password"]
+    #
+    #     db_name = config_doc["database"]["name"]
+    # return f"postgresql+psycopg2://{db_user}:{db_password}@{db_host}/{db_name}"
+    conf = cfg.get('database')
+    return f"postgresql+psycopg2://{conf['user']}:{conf['password']}@{conf['host']}/{conf['name']}"
 
 
 def get_db_schema() -> str:
-    with open(CONFIG_PATH, "r") as config_fp:
-        config_doc = tomlkit.load(config_fp)
-
-        return config_doc["database"]["schema"]
+    # with open(CONFIG_PATH, "r") as config_fp:
+    #     config_doc = tomlkit.load(config_fp)
+    #
+    #     return config_doc["database"]["schema"]
+    conf = cfg.get('database')
+    return conf['schema']
 
 
 Base = None

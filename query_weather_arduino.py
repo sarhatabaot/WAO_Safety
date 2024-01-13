@@ -6,7 +6,7 @@ from serial_weather_device import SerialWeatherDevice
 from my_parser import Parser
 
 
-class QueryWeatherArduino(SerialWeatherDevice, ABC):
+class ArduinoInterface(SerialWeatherDevice, ABC):
     """
     This is a base class for several similar Arduino devices.
     All devices that inherit from this class are devices with this API:
@@ -41,16 +41,16 @@ class QueryWeatherArduino(SerialWeatherDevice, ABC):
 
         return response_txt
 
-    def _send_and_parse_query(self, parma_name, wait: float, format_str: str) -> Tuple[Union[int, float]]:
+    def _send_and_parse_query(self, param_name, wait: float, format_str: str) -> Tuple[Union[int, float]]:
         """
         Sends a request and returns the values in the request.
         All the arduino responses are in the format of: <some text><value><some text><value 2><some text>.
-        :param parma_name: name of query
+        :param param_name: name of query
         :param wait: time to sleep
         :param format_str: format of the response. See Parser documentation for details.
         :return: A tuple contaminating the values from the response
         """
-        response = self._query(parma_name, wait)
+        response = self._query(param_name, wait)
 
         return Parser.parse(format_str, response)
 

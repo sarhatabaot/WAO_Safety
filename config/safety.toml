@@ -1,0 +1,114 @@
+#
+# Guidelines:
+# - Section names:
+#   - are lower case
+#   - multi-word names use dash ('-') separators as in 'compound-section-name'
+#
+[global]
+    projects = [    # a list of canonical project names
+        "last",
+        "mast",
+        "wfast",
+        "past"
+    ]
+
+    stations = [
+        "davis",            # Davis Instruments Vantage-Pro2 weather station
+        "inside-arduino",   # Inside Arduino
+        "outside-arduino",  # Outside Arduino
+        "cyclope",          # The Cyclope seeing monitor
+        "tessw"             # The TESS-W cloud-cover monitor
+    ]
+
+[database]
+    host = "last0"
+    name = "last_operational"
+    user = "ocs"
+    password = "physics"
+    schema = "sensors"
+
+    #
+    # Stations are data-sources, each potentially contributing one or more datums.
+    # NOTE:
+    #   - The station names are used below to define sensor data-sources
+    #   - If not specified, enabled == false
+    #
+[stations.davis]
+    interface = "/dev/ttyUSB0"
+    baud = 19200
+    interval = 60
+    enabled = true
+
+[stations.inside-arduino]
+    interface = "/dev/ttyUSB1"
+    baud = 115200
+    interval = 60
+    enabled = true
+
+[stations.outside-arduino]
+    interface = "/dev/ttyACM0"
+    baud = 115200
+    interval = 60
+    enabled = true
+
+[stations.cyclope]
+    host = "x.y.z.w"
+    port = 12345
+    interval = 60
+
+[stations.tessw]
+    host = "x.y.z.w"
+    port = 12345
+    interval = 60
+
+#
+# The following sections define sensors that contribute to the safe/unsafe decision.
+# Each sensor contributes its safe/unsafe value.  The system is safe iff ALL the sensors are 'safe'.
+# Sensors can be:
+# - one-shot: ('nreadings' == 1, default if no 'nreadings'). Only the latest reading is considered
+# - cumulative: ('nreadings' > 1).  A number of readings are remembered
+#   - The sensor is 'safe' IFF all the readings are 'safe'
+#   - If the sensor changes from 'unsafe' to 'safe' it will remain 'unsafe' for a 'settling' [seconds] period to
+#      prevent jitter.  It will become safe ONLY if ALL readings are safe after the 'settling' period
+#
+# Sensor attributes:
+# - 'source':       [station:value] where is it obtained from (e.g. davis:humidity)
+# - 'nreadings':    [int]           how many readings are remembered (default: 1)
+# - 'min', 'max':   [float, float)  the safety range.  (default: 'min' == 0)
+#
+[sensors.sun]           # The sun elevation [degrees]
+    dusk = -14.3 # [deg]
+    dawn = -13.0 # [deg]
+
+[sensors.humidity]      # relative humidity [percent]
+    max = 90
+    source = "davis:humidity_in"
+    nreadings = 3
+    settling = 600
+
+[sensors.wind-speed]    # [km/h]
+    max = 40
+    source = "davis:wind_speed"
+    nreadings = 5
+    settling = 800
+
+[sensors.cloud-cover]   # [percent]
+    max = 45
+    source = "tessw:cover"
+    nreadings = 3
+    settling = 600
+
+[sensors.dew-point]     # [centigrades]
+    max = 15
+    source = "davis:dewpoint"
+    nreadings = 5
+    settling = 600
+
+#
+# Projects may override sensor definitions, otherwise they'll get the defaults above
+#
+[last.sensors.wind-speed]
+    max = 35                                # LAST is more sensitive to wind-speed
+    nreadings = 7                           # - needs more readings to decide if safe/unsafe
+    source = "outside-arduino:wind_speed"   # - doesn't trust the davis station, prefers outside-arduino instead
+    settling = 800                          # - wants more time to settle down when transfering from unsafe to safe

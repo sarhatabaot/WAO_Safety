@@ -19,8 +19,8 @@ db_manager = DbManager()
 
 @asynccontextmanager
 async def lifespan(app):
-    db_manager.connect()
-    db_manager.open_session()
+    # db_manager.connect()
+    # db_manager.open_session()
     weather_monitor.start_measuring()
     yield
     weather_monitor.stop_measuring()
@@ -143,3 +143,8 @@ saving_functions = {device: function for device, function in ALL_SAVING_FUNCTION
 
 range_safety_checker = RangeSafetyChecker()
 weather_monitor = WeatherMonitor(active_devices, saving_functions, range_safety_checker)
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

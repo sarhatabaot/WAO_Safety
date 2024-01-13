@@ -1,12 +1,14 @@
 import datetime
-from typing import Optional
+import logging
+from typing import Optional, List
 
 from serial import Serial
 
 from serial_weather_device import SerialWeatherDevice
-from weather_measurement import WeatherMeasurement
-from weather_parameter import WeatherParameter
-
+from stations import Station, Reading, Datum, SerialStation
+from enum import Enum
+from utils import cfg
+from logging import getLogger
 
 class UnitConverter:
     @staticmethod
@@ -18,61 +20,76 @@ class UnitConverter:
         return speed_mph / 1.60934
 
 
-class LoopPacket:
-    PacketLength = 99
-    PacketDataLength = 97
-
-    def __init__(self, /, timestamp, pressure_out, temperature_in, temperature_out,
-                 humidity_in, humidity_out, wind_speed, wind_direction, solar_radiation, rain_rate):
-        self.timestamp: datetime.datetime = timestamp
-        self.pressure_out: float = pressure_out
-        self.temperature_in: float = temperature_in
-        self.temperature_out: float = temperature_out
-        self.humidity_in: int = humidity_in
-        self.humidity_out: int = humidity_out
-        self.wind_speed: float = wind_speed
-        self.wind_direction: int = wind_direction
-        self.solar_radiation = solar_radiation
-        self.rain_rate = rain_rate
+class VantageProDatum(str, Enum, Datum):
+    Barometer = "barometer",
+    InsideTemperature = "inside_temperature",
+    InsideHumidity = "inside_humidity",
+    OutsideTemperature = "outside_temperature",
+    WindSpeed = "wind_speed",
+    WindDirection = "wind_direction",
+    OutSideHumidity = "outside_humidity",
+    RainRate = "rain_rate",
+    UV = "uv",
+    SolarRadiation = "solar_radiation",
 
     @classmethod
-    def parse(cls, packet: bytes, timestamp: datetime.datetime):
+    def names(cls) -> List[str]:
+        return list(cls.__members__.keys())
+
+
+class VantageProReading(Reading):
+    def __init__(self):
+        super().__init__()
+        for name in VantageProDatum.names():
+            self.data[name] = None
+
+
+class LoopPacket:
+    PacketLength = 99
+    PacketDataLength = PacketLength - 2
+
+    @classmethod
+    def parse(cls, packet: bytes, timestamp: datetime.datetime) -> VantageProReading:
         if len(packet) != LoopPacket.PacketLength:
-            return None
+            raise f"expected {LoopPacket.PacketLength}, got {len(packet)} instead!"
 
         if not LoopPacket.is_crc_correct(packet):
-            return None
+            raise f"Bad CRC!"
+
+        ret: VantageProReading = VantageProReading()
 
         pressure_bytes = packet[7:9]
-        pressure_out = LoopPacket._parse_barometer(pressure_bytes)
+        # pressure_out = LoopPacket._parse_barometer(pressure_bytes)
+        ret.data[VantageProDatum.Barometer] = LoopPacket._parse_barometer(pressure_bytes)
 
-        temperature_in = LoopPacket._parse_temperature(packet[9:11])
+        # temperature_in = LoopPacket._parse_temperature(packet[9:11])
+        ret.data[VantageProDatum.InsideTemperature] = LoopPacket._parse_temperature(packet[9:11])
 
-        humidity_in = packet[11]
+        # humidity_in = packet[11]
+        ret.data[VantageProDatum.InsideHumidity] = packet[11]
 
-        temperature_out = LoopPacket._parse_temperature(packet[12:14])
+        # temperature_out = LoopPacket._parse_temperature(packet[12:14])
+        ret.data[VantageProDatum.OutsideTemperature] = LoopPacket._parse_temperature(packet[12:14])
 
         wind_speed_mph = packet[14]
-        wind_speed = UnitConverter.mph_to_kph(wind_speed_mph)
+        # wind_speed = UnitConverter.mph_to_kph(wind_speed_mph)
+        ret.data[VantageProDatum.WindSpeed] = UnitConverter.mph_to_kph(wind_speed_mph)
 
-        wind_direction = int.from_bytes(packet[16:18], "little")
-        humidity_out = packet[33]
+        # wind_direction = int.from_bytes(packet[16:18], "little")
+        ret.data[VantageProDatum.WindDirection] = int.from_bytes(packet[16:18], "little")
 
-        solar_radiation = int.from_bytes(packet[44: 46], "little")
+        # humidity_out = packet[33]
+        ret.data[VantageProDatum.OutSideHumidity] = packet[33]
+
+        # solar_radiation = int.from_bytes(packet[44: 46], "little")
+        ret.data[VantageProDatum.SolarRadiation] = int.from_bytes(packet[44: 46], "little")
 
         # Convert inch/100 to inch to mm
-        rain_rate = int.from_bytes(packet[41: 42], "little") / 100.0 * 25.4
+        # rain_rate = int.from_bytes(packet[41: 42], "little") / 100.0 * 25.4
+        ret.data[VantageProDatum.RainRate] = int.from_bytes(packet[41: 42], "little") / 100.0 * 25.4
 
-        return LoopPacket(timestamp=timestamp,
-                          pressure_out=pressure_out,
-                          temperature_in=temperature_in,
-                          temperature_out=temperature_out,
-                          humidity_in=humidity_in,
-                          humidity_out=humidity_out,
-                          wind_speed=wind_speed,
-                          wind_direction=wind_direction,
-                          solar_radiation=solar_radiation,
-                          rain_rate=rain_rate)
+        ret.tstamp = timestamp
+        return ret
 
     @staticmethod
     def _parse_temperature(temp_bytes: bytes):
@@ -126,53 +143,50 @@ class LoopPacket:
                   0xef1f, 0xff3e, 0xcf5d, 0xdf7c, 0xaf9b, 0xbfba, 0x8fd9, 0x9ff8,
                   0x6e17, 0x7e36, 0x4e55, 0x5e74, 0x2e93, 0x3eb2, 0xed1, 0x1ef0]
 
-    def to_weather_measurement(self) -> WeatherMeasurement:
-        data = {WeatherParameter.TEMPERATURE_IN: self.temperature_in,
-                WeatherParameter.TEMPERATURE_OUT: self.temperature_out,
-                WeatherParameter.HUMIDITY_IN: self.humidity_in,
-                WeatherParameter.HUMIDITY_OUT: self.humidity_out,
-                WeatherParameter.PRESSURE_OUT: self.pressure_out,
-                WeatherParameter.WIND_SPEED: self.wind_speed,
-                WeatherParameter.WIND_DIRECTION: self.wind_direction,
-                WeatherParameter.SOLAR_RADIATION: self.solar_radiation,
-                WeatherParameter.RAIN: self.rain_rate}
 
-        return WeatherMeasurement(data, self.timestamp)
+class VantagePro2(SerialStation, Station):
 
+    def __init__(self, name: str):
+        self.logger = logging.getLogger(name)
+        try:
+            super(SerialStation, self).__init__(name, self.logger)
+        except Exception as ex:
+            self.logger.error(f"Cannot construct a SeriaStation", exc_info=ex)
+            return
 
-class VantagePro2(SerialWeatherDevice):
-    def __init__(self, ser: Optional[Serial] = None):
-        super().__init__(ser)
+        config = cfg.get(f"stations.{self.name}")
+        self.interval = config.data['interval'] if 'interval' in config.data else 60
 
-    def list_measurements(self):
-        return {WeatherParameter.TEMPERATURE_IN,
-                WeatherParameter.HUMIDITY_IN,
-                WeatherParameter.PRESSURE_OUT,
-                WeatherParameter.TEMPERATURE_OUT,
-                WeatherParameter.HUMIDITY_OUT,
-                WeatherParameter.WIND_SPEED,
-                WeatherParameter.WIND_DIRECTION,
-                WeatherParameter.RAIN,
-                WeatherParameter.SOLAR_RADIATION}
+    @classmethod
+    def datum_names(cls) -> List[str]:
+        """
+        The list of datums retrieved from a VantagePro2 station.
 
-    def measure_parameter(self, parameter: WeatherParameter):
-        if not self.can_measure(parameter):
-            return None
+        The names are as per the VantagePro Serial Protocol, lower-cased and with underscores instead of spaces.
 
-        if not self.__wakeup():
-            return None
+        :return:
+            list of datum names
+        """
+        return VantageProDatum.names()
 
-        measurement = self.__loop().to_weather_measurement()
+    def fetcher(self):
+        reading = None
+        try:
+            if not self.__wakeup():
+                return
+            reading = self.__loop()
+        except Exception as ex:
+            # log
+            pass
 
-        return measurement.get_parameter(parameter)
+        if reading:
+            self._readings.append(reading)
+            if hasattr(self, 'saver'):
+                self.saver(reading)
 
-    def measure_all(self):
-        if not self.__wakeup():
-            return None
-
-        measurement = self.__loop().to_weather_measurement()
-
-        return measurement
+    def saver(self, reading: VantageProReading) -> None:
+        # TODO: Use DbManager to save the reading
+        pass
 
     def check_right_port(self) -> bool:
         # wakeup if sleeping
@@ -185,7 +199,7 @@ class VantagePro2(SerialWeatherDevice):
 
         # check additional information
         # echo is not enough
-        if not self.__wrd():
+        if not self._probe():
             return False
 
         # definitely a VantagePro
@@ -216,7 +230,7 @@ class VantagePro2(SerialWeatherDevice):
 
         return response == expected_response
 
-    def __wrd(self):
+    def _probe(self):
         expected_response = bytes([6, 16])
         self.ser.write(b"WRD" + bytes([0x12, 0x4D]) + b"\n")
 
@@ -227,7 +241,5 @@ class VantagePro2(SerialWeatherDevice):
         self.ser.write(b"LOOP 1\n")
         self.ser.read(1)
 
-        loop_packet = self.ser.read(99)
-        measurement = LoopPacket.parse(loop_packet, datetime.datetime.now())
-
-        return measurement
+        loop_bytes = self.ser.read(99)
+        return LoopPacket.parse(loop_bytes, datetime.datetime.utcnow())
