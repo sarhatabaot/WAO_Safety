@@ -14,6 +14,9 @@ class Reading:
     datums: dict
     tstamp: datetime.datetime
 
+    def __init__(self):
+        self.datums = dict()
+
 
 class Station(ABC):
     """
@@ -29,6 +32,7 @@ class Station(ABC):
     """
     name: str
     interval: int
+    _readings: list
 
     @classmethod
     def datums(cls) -> List[str]:
@@ -73,7 +77,7 @@ class Station(ABC):
         #  get the number of required readings, and allocate a fifo deep enough to store the largest required number.
         #
         projects = cfg.get('global.projects')
-        sensors = cfg.datums['sensors'].keys()
+        sensors = cfg.data['sensors'].keys()
         requirements = dict()
         this_station = self.name
         self.interval = cfg.get(f"stations.{self.name}.interval")
@@ -88,28 +92,31 @@ class Station(ABC):
                     # figure out how many readings are required for each referenced datum
                     datum = source.replace(f"{this_station}:", "")
                     if datum not in requirements:
-                        requirements[datum] = list()
+                        requirements[datum] = 1
                     project_nreadings = cfg.get(f"{project}.sensors.{sensor}.nreadings")
                     if project_nreadings is None:
                         project_nreadings = 1
                     default_nreadings = cfg.get(f"sensors.{sensor}.nreadings")
                     if default_nreadings is None:
                         default_nreadings = 1
-                    requirements[datum].append(max(project_nreadings, default_nreadings))
+                    requirements[datum] = max(project_nreadings, default_nreadings)
 
-        self._readings = dict()
+        nreadings = 1
         for datum in requirements.keys():
-            nreadings = max(requirements[datum])
-            print(f"station '{self.name}': allocating {nreadings} deep fifo for _readings['{datum}']")
-            self._readings[datum] = FixedSizeFifo(nreadings)
+            nreadings = max(nreadings, requirements[datum])
 
+        print(f"station '{self.name}': allocating {nreadings} deep fifo")
+        self._readings = FixedSizeFifo(nreadings)
+
+
+    def start(self):
         if hasattr(self, 'fetcher'):
             self.lock = threading.Lock()
             self.stop_event = threading.Event()
-            self.stop_event.clear()
             self.thread = threading.Thread(target=self.fetcher_loop)
             self.thread.start()
 
+ 
     def __del__(self):
         self.stop_event.set()
 
@@ -124,22 +131,21 @@ class Station(ABC):
 
     def latest(self, datum: str, n: int = 1):
         if datum not in self._readings:
-            keys = ", ".join(self._readings.keys())
+            keys = ", ".join(self._readings.data.keys())
             raise f"Bad datum '{datum}', must be one of {keys}"
-        max_size = self._readings[datum].max_size
-        curr_size = len(self._readings[datum].data)
+        max_size = self._readings.max_size
+        curr_size = len(self._readings)
         if n > curr_size:
             raise (f"station '{self.name}': not enough readings: wanted={n}, " +
                    f"got only {curr_size} out of max={max_size}")
 
         with self.lock:
-            return self._readings[datum].data[curr_size-1-n:curr_size-1]
+            current = [ self._readings.data[k] for k in self._readings.data.keys() if k == datum]
 
-    def all_readings(self) -> dict:
-        response = dict()
-        for datum in self._readings.keys():
-            response[datum] = self.latest(datum)
-        return response
+        return current[curr_size-1-n:curr_size-1]
+
+    def all_readings(self) -> list:
+        return self._readings
 
 
 class SerialStation(Station):

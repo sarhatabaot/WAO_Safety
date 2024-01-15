@@ -4,7 +4,8 @@ from typing import List
 from enum import Enum
 
 from stations import Reading, SerialStation
-from utils import cfg
+from utils import cfg, SingletonFactory
+# from db_access import DavisDbClass, DbManager
 
 
 class UnitConverter:
@@ -143,13 +144,11 @@ class VantagePro2(SerialStation):
         self.name = name
         super().__init__(name=name)
         self.logger = logging.getLogger(self.name)
-        try:
-            super(SerialStation, self).__init__(name=self.name)
-        except Exception as ex:
-            self.logger.error(f"Cannot construct a SeriaStation", exc_info=ex)
-            return
+        self.logger.setLevel(logging.DEBUG)
+        self.interval = cfg.data['interval'] if 'interval' in cfg.data else 60
 
-        self.interval = cfg.datums['interval'] if 'interval' in cfg.datums else 60
+        from db_access import DbManager
+        self.db_manager = SingletonFactory.get_instance(DbManager)
 
     @classmethod
     def datums(cls) -> List[str]:
@@ -168,20 +167,22 @@ class VantagePro2(SerialStation):
         try:
             if not self.__wakeup():
                 return
+            self.logger.info("fetcher: woke up station")
             reading = self.__loop()
+            self.logger.info("fetcher: got packet")
         except Exception as ex:
-            # log
-            pass
+            self.logger.error("fetcher: lailed to get a LOOP packet", exc_info=ex)
+            return
 
         if reading:
             with self.lock:
-                self._readings.append(reading)
+                self._readings.push(reading)
             if hasattr(self, 'saver'):
                 self.saver(reading)
 
     def saver(self, reading: VantageProReading) -> None:
         # TODO: Use DbManager to save the reading
-        self.logger.warning(f"Hey, I have no saviour!")
+        self.db_manager.write_vantage_measurement(reading)
 
     def check_right_port(self) -> bool:
         # wakeup if sleeping
@@ -249,3 +250,8 @@ class VantagePro2(SerialStation):
             return
 
         return LoopPacket.parse(loop_bytes, datetime.datetime.utcnow())
+
+
+if __name__ == "__main__":
+    v = VantagePro2('davis')
+    v.start()

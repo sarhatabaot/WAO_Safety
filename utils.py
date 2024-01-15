@@ -1,5 +1,6 @@
 from threading import Timer, Event, Lock
 from config.config import Config
+# from db_access import DbManager
 
 
 class RepeatTimer(Timer):
@@ -33,6 +34,7 @@ class FixedSizeFifo:
 
     def get(self):
         return self.data
+    
 
 
 
@@ -49,4 +51,3 @@ class SingletonFactory:
 
 
 cfg = SingletonFactory.get_instance(Config)
-

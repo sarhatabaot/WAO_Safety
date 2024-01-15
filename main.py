@@ -21,9 +21,10 @@ from outside_arduino import OutsideArduino
 
 from sensor import Sensor
 
-from utils import cfg
+from utils import cfg, SingletonFactory
 
-db_manager = DbManager()
+# db_manager = DbManager()
+db_manager = SingletonFactory(DbManager)
 
 
 
@@ -163,7 +164,9 @@ name_to_station = {
 
 stations = []
 for name in cfg.enabled_stations:
-    stations.append(name_to_station[name](name=name))
+    station = name_to_station[name](name=name)
+    stations.append(station)
+    station.start()
 
 sensors = []
 for name in cfg.enabled_sensors:

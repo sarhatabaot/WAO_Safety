@@ -18,7 +18,9 @@ class Config:
         self.projects = self._get('global.projects')
         self.stations = list(self.data['stations'].keys())
         self.enabled_stations = [s for s in self.stations if 'enabled' in self.data['stations'][s] and self.data['stations'][s]['enabled']]
-        self.enabled_stations.append('calculator')
+
+        self.stations.insert(0, 'calculator')
+        self.enabled_stations.insert(0, 'calculator')
 
         self.sensors = list()
         self.enabled_sensors = list()
