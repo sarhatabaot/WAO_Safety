@@ -1,16 +1,16 @@
 import datetime
 import logging
-from typing import Optional, Union, List
+from typing import List
 
 from query_weather_arduino import ArduinoInterface
 # from weather_measurement import WeatherMeasurement
 # from weather_parameter import WeatherParameter
-from stations import Station, Reading, Datum, SerialStation
+from stations import Station, Reading, SerialStation
 from enum import Enum
 from utils import cfg
 
 
-class InsideArduinoDatum(str, Enum, Datum):
+class InsideArduinoDatum(str, Enum):
     TemperatureIn = "temperature_in",
     PressureIn = "pressure_in",
     VisibleLuxIn = "visible_lux_in",
@@ -21,19 +21,15 @@ class InsideArduinoDatum(str, Enum, Datum):
     RawEthanol = "raw_ethanol",
     VOC = "voc",
 
-    @classmethod
-    def names(cls) -> List[str]:
-        return list(cls.__members__.keys())
-
     
 class InsideArduinoReading(Reading):
     def __init__(self):
         super().__init__()
-        for name in InsideArduinoDatum.names():
-            self.data[name] = None
+        for name in [item.value for item in InsideArduinoDatum]:
+            self.datums[name] = None
             
     
-class InsideArduino(SerialStation, Station):
+class InsideArduino(SerialStation):
     def __init__(self, name: str):
         self.name = name
         self.logger = logging.getLogger(self.name)
@@ -44,14 +40,14 @@ class InsideArduino(SerialStation, Station):
             return
 
         config = cfg.get(f"stations.{self.name}")
-        self.interval = config.data['interval'] if 'interval' in config.data else 60
+        self.interval = config.datums['interval'] if 'interval' in config.datums else 60
 
     @staticmethod
     def get_correct_file() -> str:
         return "Indoor_multiQuery.ino"
 
-    def datum_names(self) -> List[str]:
-        return InsideArduinoDatum.names()
+    def datums(self) -> List[str]:
+        return [item.value for item in InsideArduinoDatum]
 
     def fetcher(self) -> None:
         reading = InsideArduinoReading()
@@ -74,28 +70,28 @@ class InsideArduino(SerialStation, Station):
 
     def _measure_light(self, reading: InsideArduinoReading):
         response = self._send_and_parse_query("light", 0.08, "light (Lux): {f}")
-        reading.data[InsideArduinoDatum.VisibleLuxIn] = response[0]
+        reading.datums[InsideArduinoDatum.VisibleLuxIn] = response[0]
 
     def _measure_pressure(self, reading: InsideArduinoReading):
         response = self._send_and_parse_query("pressure", 0.1, "Pressure: {f}hPa")
-        reading.data[InsideArduinoDatum.PressureIn] = response[0]
+        reading.datums[InsideArduinoDatum.PressureIn] = response[0]
 
     def _measure_temperature(self, reading: InsideArduinoReading):
         response = self._send_and_parse_query("temp", 0.1, "Temperature: {f}°C")
-        reading.data[InsideArduinoDatum.TemperatureIn] = response[0]
+        reading.datums[InsideArduinoDatum.TemperatureIn] = response[0]
 
     def _measure_gas(self, reading: InsideArduinoReading):
         response = self._send_and_parse_query("gas", 0.07,
                                               "CO2: {i} ppm\tTVOC: {i} ppb\tRaw H2: {i} \tRaw Ethanol: {i}")
-        reading.data[InsideArduinoDatum.CO2] = response[0]
-        reading.data[InsideArduinoDatum.VOC] = response[1]
-        reading.data[InsideArduinoDatum.RawH2] = response[2]
-        reading.data[InsideArduinoDatum.RawEthanol] = response[3]
+        reading.datums[InsideArduinoDatum.CO2] = response[0]
+        reading.datums[InsideArduinoDatum.VOC] = response[1]
+        reading.datums[InsideArduinoDatum.RawH2] = response[2]
+        reading.datums[InsideArduinoDatum.RawEthanol] = response[3]
 
     def _measure_flame(self, reading: InsideArduinoReading):
         response = self._send_and_parse_query("flame", 0.05, "IR reading: {i}")
-        reading.data[InsideArduinoDatum.Flame] = response[0]
+        reading.datums[InsideArduinoDatum.Flame] = response[0]
 
     def _measure_presence(self, reading: InsideArduinoReading):
         response = self._send_and_parse_query("presence", 0.05, "Presence: {i}")
-        reading.data[InsideArduinoDatum.Presence] = response[0]
+        reading.datums[InsideArduinoDatum.Presence] = response[0]

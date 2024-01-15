@@ -23,15 +23,11 @@ class OutsideArduinoDatum(str, Enum, Datum):
     WindSpeed = "wind_speed",
     WindDirection = "wind_direction",
 
-    @classmethod
-    def names(cls) -> List[str]:
-        return list(cls.__members__.keys())
-
 
 class OutsideArduinoReading(Reading):
     def __init__(self):
         for name in OutsideArduinoDatum.names():
-            self.data[name] = None
+            self.datums[name] = None
 
 
 class OutsideArduino(SerialStation, Station):
@@ -41,11 +37,11 @@ class OutsideArduino(SerialStation, Station):
         super(SerialStation, self).__init__(name=self.name, logger=self.logger)
 
         config = cfg.get(f"stations.{self.name}")
-        self.interval = config.data['interval'] if 'interval' in config.data else 60
+        self.interval = config.datums['interval'] if 'interval' in config.datums else 60
 
     @classmethod
-    def datum_names(cls) -> List[str]:
-        return OutsideArduinoDatum.names()
+    def datums(cls) -> List[str]:
+        return [item.value for item in OutsideArduinoDatum]
 
     def fetcher(self) -> None:
         reading: OutsideArduinoReading = OutsideArduinoReading()
@@ -66,22 +62,22 @@ class OutsideArduino(SerialStation, Station):
     def _measure_wind(self, reading: OutsideArduinoReading):
         wind_results = self._send_and_parse_query("wind", 0.05, "v={f} m/s  dir. {f}°")
 
-        reading.data[OutsideArduinoDatum.WindSpeed] = wind_results[0]
-        reading.data[OutsideArduinoDatum.WindDirection] = wind_results[1]
+        reading.datums[OutsideArduinoDatum.WindSpeed] = wind_results[0]
+        reading.datums[OutsideArduinoDatum.WindDirection] = wind_results[1]
 
     def _measure_light(self, reading: OutsideArduinoReading):
         light_results = self._send_and_parse_query("light", 0.08, "TSL vis(Lux) IR(luminosity): {i} {i}")
 
-        reading.data[OutsideArduinoDatum.VisibleLuxOut] = light_results[0]
-        reading.data[OutsideArduinoDatum.IrLuminosity] = light_results[1]
+        reading.datums[OutsideArduinoDatum.VisibleLuxOut] = light_results[0]
+        reading.datums[OutsideArduinoDatum.IrLuminosity] = light_results[1]
 
     def _measure_pressure_humidity_temperature(self, reading: OutsideArduinoReading):
         results = self._send_and_parse_query("pht", 0.08, "P:{f}hPa T:{f}°C RH:{f}% comp RH:{f}% dew point:{f}°C")
 
-        reading.data[OutsideArduinoDatum.PressureOut] = results[0]
-        reading.data[OutsideArduinoDatum.TemperatureOut] = results[1]
-        reading.data[OutsideArduinoDatum.HumidityOut] = results[2]
-        reading.data[OutsideArduinoDatum.DewPoint] = results[3]
+        reading.datums[OutsideArduinoDatum.PressureOut] = results[0]
+        reading.datums[OutsideArduinoDatum.TemperatureOut] = results[1]
+        reading.datums[OutsideArduinoDatum.HumidityOut] = results[2]
+        reading.datums[OutsideArduinoDatum.DewPoint] = results[3]
 
     def get_correct_file(self) -> str:
         return "Outdoor_multiQuery.ino"

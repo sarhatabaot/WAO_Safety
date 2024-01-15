@@ -17,8 +17,14 @@
         "inside-arduino",   # Inside Arduino
         "outside-arduino",  # Outside Arduino
         "cyclope",          # The Cyclope seeing monitor
-        "tessw"             # The TESS-W cloud-cover monitor
+        "tessw",            # The TESS-W cloud-cover monitor
+        "calculator",       # A station that performs internal calculations
     ]
+
+[location]                  # Geographical location (assumes all projects are in the same location)
+    longitude = 35.041
+    latitude = 30.053
+    elevation = 415.4
 
 [database]
     host = "last0"
@@ -61,6 +67,7 @@
     port = 12345
     interval = 60
 
+
 #
 # The following sections define sensors that contribute to the safe/unsafe decision.
 # Each sensor contributes its safe/unsafe value.  The system is safe iff ALL the sensors are 'safe'.
@@ -77,6 +84,7 @@
 # - 'min', 'max':   [float, float)  the safety range.  (default: 'min' == 0)
 #
 [sensors.sun]           # The sun elevation [degrees]
+    source = 'calculator:sun_elevation'
     dusk = -14.3 # [deg]
     dawn = -13.0 # [deg]
 

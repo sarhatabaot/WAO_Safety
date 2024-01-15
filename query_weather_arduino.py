@@ -4,9 +4,11 @@ from typing import Tuple, Union
 
 from serial_weather_device import SerialWeatherDevice
 from my_parser import Parser
+from stations import SerialStation
 
 
-class ArduinoInterface(SerialWeatherDevice, ABC):
+# class ArduinoInterface(SerialWeatherDevice, ABC):
+class ArduinoInterface(SerialStation, ABC):
     """
     This is a base class for several similar Arduino devices.
     All devices that inherit from this class are devices with this API:

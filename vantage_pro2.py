@@ -1,14 +1,11 @@
 import datetime
 import logging
-from typing import Optional, List
-
-from serial import Serial
-
-from serial_weather_device import SerialWeatherDevice
-from stations import Station, Reading, Datum, SerialStation
+from typing import List
 from enum import Enum
+
+from stations import Reading, SerialStation
 from utils import cfg
-from logging import getLogger
+
 
 class UnitConverter:
     @staticmethod
@@ -20,7 +17,7 @@ class UnitConverter:
         return speed_mph / 1.60934
 
 
-class VantageProDatum(str, Enum, Datum):
+class VantageProDatum(str, Enum):
     Barometer = "barometer",
     InsideTemperature = "inside_temperature",
     InsideHumidity = "inside_humidity",
@@ -32,16 +29,12 @@ class VantageProDatum(str, Enum, Datum):
     UV = "uv",
     SolarRadiation = "solar_radiation",
 
-    @classmethod
-    def names(cls) -> List[str]:
-        return list(cls.__members__.keys())
-
 
 class VantageProReading(Reading):
     def __init__(self):
         super().__init__()
-        for name in VantageProDatum.names():
-            self.data[name] = None
+        for name in VantagePro2.datums():
+            self.datums[name] = None
 
 
 class LoopPacket:
@@ -60,33 +53,33 @@ class LoopPacket:
 
         pressure_bytes = packet[7:9]
         # pressure_out = LoopPacket._parse_barometer(pressure_bytes)
-        ret.data[VantageProDatum.Barometer] = LoopPacket._parse_barometer(pressure_bytes)
+        ret.datums[VantageProDatum.Barometer] = LoopPacket._parse_barometer(pressure_bytes)
 
         # temperature_in = LoopPacket._parse_temperature(packet[9:11])
-        ret.data[VantageProDatum.InsideTemperature] = LoopPacket._parse_temperature(packet[9:11])
+        ret.datums[VantageProDatum.InsideTemperature] = LoopPacket._parse_temperature(packet[9:11])
 
         # humidity_in = packet[11]
-        ret.data[VantageProDatum.InsideHumidity] = packet[11]
+        ret.datums[VantageProDatum.InsideHumidity] = packet[11]
 
         # temperature_out = LoopPacket._parse_temperature(packet[12:14])
-        ret.data[VantageProDatum.OutsideTemperature] = LoopPacket._parse_temperature(packet[12:14])
+        ret.datums[VantageProDatum.OutsideTemperature] = LoopPacket._parse_temperature(packet[12:14])
 
         wind_speed_mph = packet[14]
         # wind_speed = UnitConverter.mph_to_kph(wind_speed_mph)
-        ret.data[VantageProDatum.WindSpeed] = UnitConverter.mph_to_kph(wind_speed_mph)
+        ret.datums[VantageProDatum.WindSpeed] = UnitConverter.mph_to_kph(wind_speed_mph)
 
         # wind_direction = int.from_bytes(packet[16:18], "little")
-        ret.data[VantageProDatum.WindDirection] = int.from_bytes(packet[16:18], "little")
+        ret.datums[VantageProDatum.WindDirection] = int.from_bytes(packet[16:18], "little")
 
         # humidity_out = packet[33]
-        ret.data[VantageProDatum.OutSideHumidity] = packet[33]
+        ret.datums[VantageProDatum.OutSideHumidity] = packet[33]
 
         # solar_radiation = int.from_bytes(packet[44: 46], "little")
-        ret.data[VantageProDatum.SolarRadiation] = int.from_bytes(packet[44: 46], "little")
+        ret.datums[VantageProDatum.SolarRadiation] = int.from_bytes(packet[44: 46], "little")
 
         # Convert inch/100 to inch to mm
         # rain_rate = int.from_bytes(packet[41: 42], "little") / 100.0 * 25.4
-        ret.data[VantageProDatum.RainRate] = int.from_bytes(packet[41: 42], "little") / 100.0 * 25.4
+        ret.datums[VantageProDatum.RainRate] = int.from_bytes(packet[41: 42], "little") / 100.0 * 25.4
 
         ret.tstamp = timestamp
         return ret
@@ -144,21 +137,22 @@ class LoopPacket:
                   0x6e17, 0x7e36, 0x4e55, 0x5e74, 0x2e93, 0x3eb2, 0xed1, 0x1ef0]
 
 
-class VantagePro2(SerialStation, Station):
+class VantagePro2(SerialStation):
 
     def __init__(self, name: str):
-        self.logger = logging.getLogger(name)
+        self.name = name
+        super().__init__(name=name)
+        self.logger = logging.getLogger(self.name)
         try:
-            super(SerialStation, self).__init__(name, self.logger)
+            super(SerialStation, self).__init__(name=self.name)
         except Exception as ex:
             self.logger.error(f"Cannot construct a SeriaStation", exc_info=ex)
             return
 
-        config = cfg.get(f"stations.{self.name}")
-        self.interval = config.data['interval'] if 'interval' in config.data else 60
+        self.interval = cfg.datums['interval'] if 'interval' in cfg.datums else 60
 
     @classmethod
-    def datum_names(cls) -> List[str]:
+    def datums(cls) -> List[str]:
         """
         The list of datums retrieved from a VantagePro2 station.
 
@@ -167,7 +161,7 @@ class VantagePro2(SerialStation, Station):
         :return:
             list of datum names
         """
-        return VantageProDatum.names()
+        return [item.value for item in VantageProDatum]
 
     def fetcher(self):
         reading = None
@@ -180,13 +174,14 @@ class VantagePro2(SerialStation, Station):
             pass
 
         if reading:
-            self._readings.append(reading)
+            with self.lock:
+                self._readings.append(reading)
             if hasattr(self, 'saver'):
                 self.saver(reading)
 
     def saver(self, reading: VantageProReading) -> None:
         # TODO: Use DbManager to save the reading
-        pass
+        self.logger.warning(f"Hey, I have no saviour!")
 
     def check_right_port(self) -> bool:
         # wakeup if sleeping
@@ -210,11 +205,14 @@ class VantagePro2(SerialStation, Station):
         wakeup_attempts = 3
 
         for _ in range(wakeup_attempts):
-            self.ser.write(b"\n")
-            response = self.ser.read(len(expected_response))
+            try:
+                self.ser.write(b"\n")
+                response = self.ser.read(len(expected_response))
+            except Exception as ex:
+                self.logger.error(f"failed to wakeup station", exc_info=ex)
+                return False
 
-            if response == expected_response:
-                return True
+            return response == expected_response
 
         return False
 
@@ -230,16 +228,24 @@ class VantagePro2(SerialStation, Station):
 
         return response == expected_response
 
-    def _probe(self):
+    def _probe(self) -> bool:
         expected_response = bytes([6, 16])
-        self.ser.write(b"WRD" + bytes([0x12, 0x4D]) + b"\n")
+        try:
+            self.ser.write(b"WRD" + bytes([0x12, 0x4D]) + b"\n")
+            response = self.ser.read(len(expected_response))
+        except Exception as ex:
+            self.logger.error(f"failed probing with WRD", exc_info=ex)
+            return False
 
-        response = self.ser.read(len(expected_response))
         return response == expected_response
 
     def __loop(self):
-        self.ser.write(b"LOOP 1\n")
-        self.ser.read(1)
+        try:
+            self.ser.write(b"LOOP 1\n")
+            self.ser.read(1)
+            loop_bytes = self.ser.read(99)
+        except Exception as ex:
+            self.logger.error(f"failed to send/receive a LOOP packet", exc_info=ex)
+            return
 
-        loop_bytes = self.ser.read(99)
         return LoopPacket.parse(loop_bytes, datetime.datetime.utcnow())

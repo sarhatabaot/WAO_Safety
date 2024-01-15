@@ -14,7 +14,17 @@ from weather_parameter import WeatherParameter
 
 from range_safety_checker import RangeSafetyChecker
 
+from vantage_pro2 import VantagePro2
+from calculator import Calculator
+from inside_arduino import InsideArduino
+from outside_arduino import OutsideArduino
+
+from sensor import Sensor
+
+from utils import cfg
+
 db_manager = DbManager()
+
 
 
 @asynccontextmanager
@@ -143,6 +153,21 @@ saving_functions = {device: function for device, function in ALL_SAVING_FUNCTION
 
 range_safety_checker = RangeSafetyChecker()
 weather_monitor = WeatherMonitor(active_devices, saving_functions, range_safety_checker)
+
+name_to_station = {
+    'calculator': Calculator,
+    'davis': VantagePro2,
+    'inside-arduino': InsideArduino,
+    'outside-arduino': OutsideArduino,
+}
+
+stations = []
+for name in cfg.enabled_stations:
+    stations.append(name_to_station[name](name=name))
+
+sensors = []
+for name in cfg.enabled_sensors:
+    sensors.append(Sensor(name=name))
 
 if __name__ == "__main__":
     import uvicorn

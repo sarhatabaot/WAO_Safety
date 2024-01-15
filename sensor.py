@@ -4,17 +4,19 @@ from typing import List
 from utils import FixedSizeFifo, cfg
 from stations import Station
 from typing import Dict, List
-from collections import namedtuple
+from main import stations
 
 
 class Setting:
     source: str
     min: float
     max: float
-    settling: float
+    seconds_for_settling: float
     nreadings: int
     station: Station
     datum: str
+    was_safe: bool = False
+    changed_to_safe: datetime.datetime = None
 
 
 class Reading:
@@ -26,8 +28,12 @@ class SafetyResponse:
     """
     The response from a **Sensor** when asked if it is safe
     """
-    is_safe: bool       # Is it safe?
+    safe: bool       # Is it safe?
     reasons: List[str]  # Why it is *unsafe*
+
+    def __init__(self, safe: bool = True, reasons: List[str] = None):
+        self.safe = safe
+        self.reasons = reasons
 
 
 class Sensor:
@@ -74,7 +80,7 @@ class Sensor:
         if 'enabled' not in station_cfg or not station_cfg['enabled']:
             raise msg + f"Station '{station_name}' is not enabled"
 
-        datum_names = stations[station_name].datum_names
+        datum_names = stations[station_name].datums
         if datum_name not in datum_names:
             raise msg + f"Datum '{datum_name} is not one of the datums for station '{station_name}'"
 
@@ -82,6 +88,40 @@ class Sensor:
         self.settings[project].station = stations[station_name]
         self.settings[project].datum = datum_name
 
-    @abstractmethod
-    def is_safe(self, project=None) -> SafetyResponse:
-        pass
+    def is_safe(self, project="default") -> SafetyResponse:
+        setting = self.settings[project]
+        out_of_range = f"out of range min={setting.min}, max={setting.max}"
+
+        try:
+            readings = setting.station.latest(setting.datum, setting.nreadings)
+        except Exception as ex:
+            return SafetyResponse(False, [f"{ex}"])
+
+        if setting.nreadings == 1:
+            # it's a one-shot sensor, just one relevant reading
+            if setting.min <= readings[0] > setting.max:
+                return SafetyResponse(False, reasons=[out_of_range])
+            else:
+                return SafetyResponse()
+
+        bad_readings = 0
+        for reading in readings:
+            if setting.min < reading >= setting.max:
+                bad_readings = bad_readings + 1
+
+        if bad_readings == 0:
+            # it is actually safe, but is it settling?
+            if setting.changed_to_safe is not None:
+                td = datetime.datetime.now() - setting.changed_to_safe
+                if td.seconds > setting.seconds_for_settling:
+                    # no bad readings (safe) and enough time passed since it changed_to_safe, we're good
+                    setting.changed_to_safe = None
+                    setting.was_safe = True
+                    return SafetyResponse()
+                else:
+                    td = datetime.timedelta(seconds=setting.seconds_for_settling) - td
+                    return SafetyResponse(False, [f"settling ({td} out of {setting.seconds_for_settling} to go)"])
+        else:   # some bad readings
+            if setting.was_safe:
+                setting.was_safe = False
+            return SafetyResponse(False, [f"{bad_readings} readings are " + out_of_range])
