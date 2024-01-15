@@ -149,6 +149,8 @@ class VantagePro2(SerialStation):
 
         from db_access import DbManager
         self.db_manager = SingletonFactory.get_instance(DbManager)
+        self.db_manager.connect()
+        self.db_manager.open_session()
 
     @classmethod
     def datums(cls) -> List[str]:
@@ -181,7 +183,6 @@ class VantagePro2(SerialStation):
                 self.saver(reading)
 
     def saver(self, reading: VantageProReading) -> None:
-        # TODO: Use DbManager to save the reading
         self.db_manager.write_vantage_measurement(reading)
 
     def check_right_port(self) -> bool:

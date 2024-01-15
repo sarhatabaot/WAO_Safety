@@ -68,6 +68,10 @@ class InsideArduino(SerialStation):
         if hasattr(self, 'saver'):
             self.saver(reading)
 
+    
+    def saver(self, reading: InsideArduinoReading) -> None:
+        self.db_manager.write_arduino_in_measurement(reading)
+
     def _measure_light(self, reading: InsideArduinoReading):
         response = self._send_and_parse_query("light", 0.08, "light (Lux): {f}")
         reading.datums[InsideArduinoDatum.VisibleLuxIn] = response[0]

@@ -59,6 +59,9 @@ class OutsideArduino(SerialStation, Station):
         if hasattr(self, 'saver'):
             self.saver(reading)
 
+    def saver(self, reading: OutsideArduinoReading) -> None:
+        self.db_manager.write_arduino_out_measurement(reading)
+
     def _measure_wind(self, reading: OutsideArduinoReading):
         wind_results = self._send_and_parse_query("wind", 0.05, "v={f} m/s  dir. {f}°")
 

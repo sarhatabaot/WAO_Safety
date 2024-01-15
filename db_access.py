@@ -9,6 +9,8 @@ from weather_measurement import WeatherMeasurement
 from weather_parameter import WeatherParameter
 from utils import cfg
 from vantage_pro2 import VantageProReading, VantageProDatum
+from inside_arduino import InsideArduinoReading, InsideArduinoDatum
+from outside_arduino import OutsideArduinoReading, OutsideArduinoDatum
 
 
 # def get_db_url() -> str:
@@ -79,6 +81,10 @@ class DbManager:
     def close_session(self):
         self.session.close()
 
+    def __del__(self):
+        self.close_session()
+        self.disconnect()
+
     def write_vantage_measurement(self, reading: VantageProReading):
         davis = DavisDbClass(
             temp_in = reading.datums[VantageProDatum.InsideTemperature],
@@ -92,50 +98,38 @@ class DbManager:
             solar_radiation = reading.datums[VantageProDatum.SolarRadiation],
             tstamp = reading.tstamp,
         )
-        # davis = DavisDbClass(
-        #     temp_in=measurement.get_parameter(WeatherParameter.TEMPERATURE_IN),
-        #     humidity_in=measurement.get_parameter(WeatherParameter.HUMIDITY_IN),
-        #     pressure_out=measurement.get_parameter(WeatherParameter.PRESSURE_OUT),
-        #     temp_out=measurement.get_parameter(WeatherParameter.TEMPERATURE_OUT),
-        #     humidity_out=measurement.get_parameter(WeatherParameter.HUMIDITY_OUT),
-        #     wind_speed=measurement.get_parameter(WeatherParameter.WIND_SPEED),
-        #     wind_direction=measurement.get_parameter(WeatherParameter.WIND_DIRECTION),
-        #     rain=measurement.get_parameter(WeatherParameter.RAIN),
-        #     solar_radiation=measurement.get_parameter(WeatherParameter.SOLAR_RADIATION),
-        #     tstamp=measurement.get_timestamp(),
-        # )
 
         self.session.add(davis)
         self.session.commit()
 
-    def write_arduino_in_measurement(self, measurement: WeatherMeasurement):
+    def write_arduino_in_measurement(self, reading: InsideArduinoReading):
         arduino_in = ArduinoInDbClass(
-            presence=measurement.get_parameter(WeatherParameter.PRESENCE),
-            temp_in=measurement.get_parameter(WeatherParameter.TEMPERATURE_IN),
-            pressure_in=measurement.get_parameter(WeatherParameter.PRESSURE_IN),
-            visible_lux_in=measurement.get_parameter(WeatherParameter.VISIBLE_LUX_IN),
-            flame=measurement.get_parameter(WeatherParameter.FLAME),
-            co2=measurement.get_parameter(WeatherParameter.CO2),
-            voc=measurement.get_parameter(WeatherParameter.VOC),
-            raw_h2=measurement.get_parameter(WeatherParameter.RAW_H2),
-            raw_ethanol=measurement.get_parameter(WeatherParameter.RAW_ETHANOL),
-            tstamp=measurement.get_timestamp()
+            presence = reading.datums[InsideArduinoDatum.Presence],
+            temp_in = reading.datums[InsideArduinoDatum.TemperatureIn],
+            pressure_in = reading.datums[InsideArduinoDatum.PressureIn],
+            visible_lux_in = reading.datums[InsideArduinoDatum.VisibleLuxIn],
+            flame = reading.datums[InsideArduinoDatum.Flame],
+            co2 = reading.datums[InsideArduinoDatum.CO2],
+            voc = reading.datums[InsideArduinoDatum.VOC],
+            raw_h2 = reading.datums[InsideArduinoDatum.RawH2],
+            raw_ethanol = reading.datums[InsideArduinoDatum.RawEthanol],
+            tstamp = reading.tstamp,
         )
 
         self.session.add(arduino_in)
         self.session.commit()
 
-    def write_arduino_out_measurement(self, measurement: WeatherMeasurement):
+    def write_arduino_out_measurement(self, reading: OutsideArduinoReading):
         arduino_out = ArduinoOutDbClass(
-            temp_out=measurement.get_parameter(WeatherParameter.TEMPERATURE_OUT),
-            humidity_out=measurement.get_parameter(WeatherParameter.HUMIDITY_OUT),
-            pressure_out=measurement.get_parameter(WeatherParameter.PRESSURE_OUT),
-            dew_point=measurement.get_parameter(WeatherParameter.DEW_POINT),
-            visible_lux_out=measurement.get_parameter(WeatherParameter.VISIBLE_LUX_OUT),
-            ir_luminosity=measurement.get_parameter(WeatherParameter.IR_LUMINOSITY),
-            wind_speed=measurement.get_parameter(WeatherParameter.WIND_SPEED),
-            wind_direction=measurement.get_parameter(WeatherParameter.WIND_DIRECTION),
-            tstamp=measurement.get_timestamp()
+            temp_out = reading.datum[OutsideArduinoDatum.TemperatureOut],
+            humidity_out = reading.datum[OutsideArduinoDatum.HumidityOut],
+            pressure_out = reading.datum[OutsideArduinoDatum.PressureOut],
+            dew_point  = reading.datum[OutsideArduinoDatum.DewPoint],
+            visible_lux_out = reading.datum[OutsideArduinoDatum.VISIBLE_LUX_OUT],
+            ir_luminosity = reading.datum[OutsideArduinoDatum.IrLuminosity],
+            wind_speed = reading.datum[OutsideArduinoDatum.WindSpeed],
+            wind_direction = reading.datum[OutsideArduinoDatum.WindDirection],
+            tstamp = reading.tstamp
         )
 
         self.session.add(arduino_out)
