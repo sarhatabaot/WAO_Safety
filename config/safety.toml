@@ -4,7 +4,12 @@
 #   - are lower case
 #   - multi-word names use dash ('-') separators as in 'compound-section-name'
 #
+[server]
+    host = "0.0.0.0"        # address on which the server listens
+    port = 8000             #  and port
+
 [global]
+
     projects = [    # a list of canonical project names
         "last",
         "mast",
@@ -40,22 +45,33 @@
     #   - If not specified, enabled == false
     #
 [stations.davis]
+    # datums:
+    #  barometer, inside_temperature, inside_humidity,
+    #  outside_temperature, wind_speed, wind_direction,
+    #  outside_humidity, rain_rate, uv, solar_radiation
     interface = "/dev/ttyUSB0"
     baud = 19200
     interval = 60
     enabled = true
 
 [stations.inside-arduino]
+    # datums:
+    #   temperature_in, pressure_in, visible_lux_in,
+    #   presence, flame, co2, raw_h2, raw_ethanol, voc
     interface = "/dev/ttyUSB1"
     baud = 115200
     interval = 60
-    enabled = true
+    # enabled = true
 
 [stations.outside-arduino]
-    interface = "/dev/ttyACM0"
+    # datums:
+    #   temperature_out, humidity_out, pressure_out,
+    #   dew_point, visible_lux_out, ir_luminosity,
+    #   wind_speed, wind_direction
+    interface = "/dev/ttyACM1"
     baud = 115200
     interval = 60
-    enabled = true
+    # enabled = true
 
 [stations.cyclope]
     host = "x.y.z.w"
@@ -90,7 +106,7 @@
 
 [sensors.humidity]      # relative humidity [percent]
     max = 90
-    source = "davis:humidity_in"
+    source = "davis:inside_humidity"
     nreadings = 3
     settling = 600
 

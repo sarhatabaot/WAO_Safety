@@ -2,12 +2,10 @@ import datetime
 import logging
 from typing import List
 
-from query_weather_arduino import ArduinoInterface
-# from weather_measurement import WeatherMeasurement
-# from weather_parameter import WeatherParameter
-from stations import Station, Reading, SerialStation
+from station import Reading, SerialStation
 from enum import Enum
-from utils import cfg
+from utils import cfg, SingletonFactory, init_log
+from arduino import Arduino
 
 
 class InsideArduinoDatum(str, Enum):
@@ -20,30 +18,40 @@ class InsideArduinoDatum(str, Enum):
     RawH2 = "raw_h2",
     RawEthanol = "raw_ethanol",
     VOC = "voc",
+    
+    @classmethod
+    def names(cls) -> list:
+        return [item.value for item in cls]
 
     
 class InsideArduinoReading(Reading):
     def __init__(self):
         super().__init__()
-        for name in [item.value for item in InsideArduinoDatum]:
+        for name in InsideArduinoDatum.names():
             self.datums[name] = None
             
     
-class InsideArduino(SerialStation):
+class InsideArduino(SerialStation, Arduino):
     def __init__(self, name: str):
         self.name = name
         self.logger = logging.getLogger(self.name)
+        init_log(self.logger)
+
         try:
-            super(SerialStation).__init__(name=self.name, logger=self.logger)
+            super().__init__(name=self.name)
         except Exception as ex:
-            self.logger.error(f"Cannot construct SerialStation for '{self.name}'")
+            self.logger.error(f"Cannot construct SerialStation for '{self.name}'", exc_info=ex)
             return
 
         config = cfg.get(f"stations.{self.name}")
-        self.interval = config.datums['interval'] if 'interval' in config.datums else 60
+        self.interval = config['interval'] if 'interval' in config else 60
 
-    @staticmethod
-    def get_correct_file() -> str:
+        from db_access import DbManager
+        self.db_manager = SingletonFactory.get_instance(DbManager)
+        self.db_manager.connect()
+        self.db_manager.open_session()
+
+    def get_correct_file(self) -> str:
         return "Indoor_multiQuery.ino"
 
     def datums(self) -> List[str]:
@@ -53,49 +61,63 @@ class InsideArduino(SerialStation):
         reading = InsideArduinoReading()
 
         try:
-            self._measure_pressure(reading)
-            self._measure_temperature(reading)
-            self._measure_gas(reading)
-            self._measure_flame(reading)
-            self._measure_presence(reading)
-            self._measure_light(reading)
+            self.get_pressure(reading)
+            self.get_temperature(reading)
+            self.get_gas(reading)
+            self.get_flame(reading)
+            self.get_presence(reading)
+            self.get_light(reading)
         except Exception as ex:
-            # TODO: log
+            self.logger.error(f"fetcher: Failed", exc_info=ex)
             return
 
         reading.tstamp = datetime.datetime.utcnow()
-        self._readings.append(reading)
+        self.readings.push(reading)
         if hasattr(self, 'saver'):
             self.saver(reading)
 
-    
     def saver(self, reading: InsideArduinoReading) -> None:
-        self.db_manager.write_arduino_in_measurement(reading)
+        from db_access import ArduinoInDbClass
 
-    def _measure_light(self, reading: InsideArduinoReading):
-        response = self._send_and_parse_query("light", 0.08, "light (Lux): {f}")
+        arduino_in = ArduinoInDbClass(
+            presence=reading.datums[InsideArduinoDatum.Presence],
+            temp_in=reading.datums[InsideArduinoDatum.TemperatureIn],
+            pressure_in=reading.datums[InsideArduinoDatum.PressureIn],
+            visible_lux_in=reading.datums[InsideArduinoDatum.VisibleLuxIn],
+            flame=reading.datums[InsideArduinoDatum.Flame],
+            co2=reading.datums[InsideArduinoDatum.CO2],
+            voc=reading.datums[InsideArduinoDatum.VOC],
+            raw_h2=reading.datums[InsideArduinoDatum.RawH2],
+            raw_ethanol=reading.datums[InsideArduinoDatum.RawEthanol],
+            tstamp=reading.tstamp,
+        )
+
+        self.db_manager.session.add(arduino_in)
+        self.db_manager.session.commit()
+
+    def get_light(self, reading: InsideArduinoReading):
+        response = self.query("light", 0.08, "light (Lux): {f}")
         reading.datums[InsideArduinoDatum.VisibleLuxIn] = response[0]
 
-    def _measure_pressure(self, reading: InsideArduinoReading):
-        response = self._send_and_parse_query("pressure", 0.1, "Pressure: {f}hPa")
+    def get_pressure(self, reading: InsideArduinoReading):
+        response = self.query("pressure", 0.1, "Pressure: {f}hPa")
         reading.datums[InsideArduinoDatum.PressureIn] = response[0]
 
-    def _measure_temperature(self, reading: InsideArduinoReading):
-        response = self._send_and_parse_query("temp", 0.1, "Temperature: {f}°C")
+    def get_temperature(self, reading: InsideArduinoReading):
+        response = self.query("temp", 0.1, "Temperature: {f}°C")
         reading.datums[InsideArduinoDatum.TemperatureIn] = response[0]
 
-    def _measure_gas(self, reading: InsideArduinoReading):
-        response = self._send_and_parse_query("gas", 0.07,
-                                              "CO2: {i} ppm\tTVOC: {i} ppb\tRaw H2: {i} \tRaw Ethanol: {i}")
+    def get_gas(self, reading: InsideArduinoReading):
+        response = self.query("gas", 0.07, "CO2: {i} ppm\tTVOC: {i} ppb\tRaw H2: {i} \tRaw Ethanol: {i}")
         reading.datums[InsideArduinoDatum.CO2] = response[0]
         reading.datums[InsideArduinoDatum.VOC] = response[1]
         reading.datums[InsideArduinoDatum.RawH2] = response[2]
         reading.datums[InsideArduinoDatum.RawEthanol] = response[3]
 
-    def _measure_flame(self, reading: InsideArduinoReading):
-        response = self._send_and_parse_query("flame", 0.05, "IR reading: {i}")
+    def get_flame(self, reading: InsideArduinoReading):
+        response = self.query("flame", 0.05, "IR reading: {i}")
         reading.datums[InsideArduinoDatum.Flame] = response[0]
 
-    def _measure_presence(self, reading: InsideArduinoReading):
-        response = self._send_and_parse_query("presence", 0.05, "Presence: {i}")
+    def get_presence(self, reading: InsideArduinoReading):
+        response = self.query("presence", 0.05, "Presence: {i}")
         reading.datums[InsideArduinoDatum.Presence] = response[0]

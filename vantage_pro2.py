@@ -3,9 +3,8 @@ import logging
 from typing import List
 from enum import Enum
 
-from stations import Reading, SerialStation
-from utils import cfg, SingletonFactory
-# from db_access import DavisDbClass, DbManager
+from station import Reading, SerialStation
+from utils import cfg, SingletonFactory, init_log
 
 
 class UnitConverter:
@@ -144,7 +143,7 @@ class VantagePro2(SerialStation):
         self.name = name
         super().__init__(name=name)
         self.logger = logging.getLogger(self.name)
-        self.logger.setLevel(logging.DEBUG)
+        init_log(self.logger)
         self.interval = cfg.data['interval'] if 'interval' in cfg.data else 60
 
         from db_access import DbManager
@@ -165,25 +164,40 @@ class VantagePro2(SerialStation):
         return [item.value for item in VantageProDatum]
 
     def fetcher(self):
-        reading = None
         try:
             if not self.__wakeup():
+                self.logger.error("could not wake-up station")
                 return
-            self.logger.info("fetcher: woke up station")
             reading = self.__loop()
-            self.logger.info("fetcher: got packet")
+            self.logger.info("got LOOP packet")
         except Exception as ex:
-            self.logger.error("fetcher: lailed to get a LOOP packet", exc_info=ex)
+            self.logger.error("failed to get a LOOP packet", exc_info=ex)
             return
 
         if reading:
             with self.lock:
-                self._readings.push(reading)
+                self.readings.push(reading)
             if hasattr(self, 'saver'):
                 self.saver(reading)
 
     def saver(self, reading: VantageProReading) -> None:
-        self.db_manager.write_vantage_measurement(reading)
+        from db_access import DavisDbClass
+
+        davis = DavisDbClass(
+            temp_in=reading.datums[VantageProDatum.InsideTemperature],
+            humidity_in=reading.datums[VantageProDatum.InsideHumidity],
+            pressure_out=reading.datums[VantageProDatum.Barometer],
+            temp_out=reading.datums[VantageProDatum.OutsideTemperature],
+            humidity_out=reading.datums[VantageProDatum.OutSideHumidity],
+            wind_speed=reading.datums[VantageProDatum.WindSpeed],
+            wind_direction=reading.datums[VantageProDatum.WindDirection],
+            rain=reading.datums[VantageProDatum.RainRate],
+            solar_radiation=reading.datums[VantageProDatum.SolarRadiation],
+            tstamp=reading.tstamp,
+        )
+
+        self.db_manager.session.add(davis)
+        self.db_manager.session.commit()
 
     def check_right_port(self) -> bool:
         # wakeup if sleeping
@@ -202,7 +216,7 @@ class VantagePro2(SerialStation):
         # definitely a VantagePro
         return True
 
-    def __wakeup(self):
+    def __wakeup(self) -> bool:
         expected_response = bytes([10, 13])
         wakeup_attempts = 3
 
@@ -253,6 +267,6 @@ class VantagePro2(SerialStation):
         return LoopPacket.parse(loop_bytes, datetime.datetime.utcnow())
 
 
-if __name__ == "__main__":
-    v = VantagePro2('davis')
-    v.start()
+# if __name__ == "__main__":
+#     v = VantagePro2('davis')
+#     v.start()

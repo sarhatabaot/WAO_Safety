@@ -4,11 +4,10 @@ from typing import Tuple, Union
 
 from serial_weather_device import SerialWeatherDevice
 from my_parser import Parser
-from stations import SerialStation
+from station import SerialStation
 
 
-# class ArduinoInterface(SerialWeatherDevice, ABC):
-class ArduinoInterface(SerialStation, ABC):
+class Arduino(ABC):
     """
     This is a base class for several similar Arduino devices.
     All devices that inherit from this class are devices with this API:
@@ -43,7 +42,7 @@ class ArduinoInterface(SerialStation, ABC):
 
         return response_txt
 
-    def _send_and_parse_query(self, param_name, wait: float, format_str: str) -> Tuple[Union[int, float]]:
+    def query(self, param_name, wait: float, format_str: str) -> Tuple[Union[int, float]]:
         """
         Sends a request and returns the values in the request.
         All the arduino responses are in the format of: <some text><value><some text><value 2><some text>.

@@ -7,7 +7,7 @@ from astropy import units as u
 from astropy.coordinates import EarthLocation
 
 from utils import cfg
-from stations import Station, Reading
+from station import Station, Reading
 
 
 class CalculatorDatum(str, Enum):

@@ -2,9 +2,9 @@ import datetime
 from abc import ABC, abstractmethod, abstractproperty
 from typing import List
 from utils import FixedSizeFifo, cfg
-from stations import Station
+# from station import Station
 from typing import Dict, List
-from main import stations
+# from main import stations
 
 
 class Setting:
@@ -13,8 +13,9 @@ class Setting:
     max: float
     seconds_for_settling: float
     nreadings: int
-    station: Station
-    datum: str
+    # station: Station
+    station_name: str
+    datum_name: str
     was_safe: bool = False
     changed_to_safe: datetime.datetime = None
 
@@ -48,7 +49,7 @@ class Sensor:
     * **settling** - settling time [seconds] during which the sensor remains *unsafe* after all the relevant readings have become *safe*
     """
 
-    station: Station
+    # station: Station
     enabled: bool = False
     settings: Dict[str, Setting]
 
@@ -58,7 +59,7 @@ class Sensor:
         self.settings = dict()
         self.settings["default"] = cfg.get(f"sensors.{self.name}")
         self.check_and_set_source(project="default", source=self.settings["default"]['source'])
-        for project in cfg.get("global.projects"):
+        for project in cfg.projects:
             setting = cfg.get(f"{project}.sensors.{self.name}")
             if setting is not None:
                 self.settings[project] = setting
@@ -74,26 +75,31 @@ class Sensor:
 
         station_name = src[0]
         datum_name = src[1]
+        if station_name not in cfg.enabled_stations:
+            raise msg + f"Station '{station_name}' is not enabled"
         station_cfg = cfg.get(f"stations.{station_name}")
         if station_cfg is None:
             raise msg + f"No configuration for station='{station_name}"
-        if 'enabled' not in station_cfg or not station_cfg['enabled']:
-            raise msg + f"Station '{station_name}' is not enabled"
 
-        datum_names = stations[station_name].datums
-        if datum_name not in datum_names:
-            raise msg + f"Datum '{datum_name} is not one of the datums for station '{station_name}'"
+        # station = [s for s in stations if s.name == station_name]
+        # if station is None:
+        #     raise f"Cannot find station named '{station_name}' in stations"
+
+        # station = station[0]
+        # datum_names = station.datums()
+        # if datum_name not in datum_names:
+        #     raise msg + f"Datum '{datum_name} is not one of the datums for station '{station_name}'"
 
         self.settings[project].source = source
-        self.settings[project].station = stations[station_name]
-        self.settings[project].datum = datum_name
+        # self.settings[project].station = station
+        self.settings[project].datum_name = datum_name
 
     def is_safe(self, project="default") -> SafetyResponse:
         setting = self.settings[project]
         out_of_range = f"out of range min={setting.min}, max={setting.max}"
 
         try:
-            readings = setting.station.latest(setting.datum, setting.nreadings)
+            readings = setting.station.latest(setting.datum_name, setting.nreadings)
         except Exception as ex:
             return SafetyResponse(False, [f"{ex}"])
 

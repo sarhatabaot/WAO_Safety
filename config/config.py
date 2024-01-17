@@ -1,11 +1,12 @@
 import os.path
 import tomlkit
-from typing import List
+from typing import List, NamedTuple, Dict
 
 
 class Config:
     data: dict
     filename: str
+    projects: List[str]
     stations: List[str]
     enabled_stations: List[str]
     sensors: List[str]
@@ -15,7 +16,7 @@ class Config:
         self.filename = os.path.realpath('config/safety.toml')
         with open(self.filename, 'r') as file:
             self.data = tomlkit.load(file)
-        self.projects = self._get('global.projects')
+        self.projects = self.data['global']['projects']
         self.stations = list(self.data['stations'].keys())
         self.enabled_stations = [s for s in self.stations if 'enabled' in self.data['stations'][s] and self.data['stations'][s]['enabled']]
 
@@ -72,3 +73,13 @@ class Config:
             return ret
         else:
             return self._get(path)
+
+
+class Source(NamedTuple):
+    station: str
+    datum: str
+
+
+def split_source(source: str) -> NamedTuple:
+    s = source.split(':')
+    return Source(s[0], s[1])
