@@ -21,6 +21,23 @@ class Reading:
         self.datums = dict()
 
 
+class Sensor:
+    name: str
+    project: str
+    datum: str
+    safe: bool
+    reasons: List[str]
+    setting: Setting
+
+    def __init__(self, name: str, project: str, datum: str, setting: Setting):
+        self.name = name
+        self.project = project
+        self.datum = datum
+        self.safe = False
+        self.setting = setting
+        self.reasons = []
+
+
 class Station(ABC):
     """
     A **Station** periodically reads a *data-source* from which it gets a bunch of *datums*.
@@ -36,7 +53,7 @@ class Station(ABC):
     name: str
     interval: int
     readings: FixedSizeFifo
-    clients: Dict[str, Dict[str, Dict[str, Setting]]]
+    clients: list
 
     @classmethod
     def datums(cls) -> List[str]:
@@ -75,49 +92,8 @@ class Station(ABC):
             return
 
         self.name = name
-        #
-        # For each of the 'Projects' that have 'Sensors' using this station as their 'source'
-        #  get the number of required readings, and allocate a fifo deep enough to store the largest required number.
-        #
-        projects = cfg.get('global.projects')
-        requirements = dict()
-        this_station = self.name
         self.interval = cfg.get(f"stations.{self.name}.interval")
-        self.clients = dict()
-
-        # for project in projects:
-        #     if not hasattr(cfg.data, project):
-        #         continue
-        #     if not hasattr(cfg.data[project], 'sensors'):
-        #         continue
-        #
-        #     for sensor in cfg.data[project]['sensors'].keys():
-        #         source = cfg.get(f"sensors.{sensor}.source")
-        #         project_source: str = cfg.get(f"{project}.sensors.{sensor}.source")
-        #         if project_source is not None:
-        #             source = project_source
-        #         if source is None:
-        #             continue
-        #         station, datum = split_source(source)
-        #         if station != this_station:
-        #             continue
-        #
-        #         if datum not in requirements:
-        #             requirements[datum] = 1
-        #         project_nreadings = cfg.get(f"{project}.sensors.{sensor}.nreadings")
-        #         if project_nreadings is None:
-        #             project_nreadings = 1
-        #         default_nreadings = cfg.get(f"sensors.{sensor}.nreadings")
-        #         if default_nreadings is None:
-        #             default_nreadings = 1
-        #         requirements[datum] = max(project_nreadings, default_nreadings)
-        #
-        # nreadings = 1
-        # for datum in requirements.keys():
-        #     nreadings = max(nreadings, requirements[datum])
-        #
-        # print(f"station '{self.name}': allocating {nreadings} deep fifo")
-        # self.readings = FixedSizeFifo(nreadings)
+        self.clients = list()
 
         self.lock = threading.Lock()
         self.stop_event = threading.Event()
@@ -152,19 +128,14 @@ class Station(ABC):
                     if station != self.name or datum not in self.datums():
                         continue
 
-                    if self.clients is None:
-                        self.clients = dict()
-                    if project not in self.clients:
-                        self.clients[project] = dict()
+                    self.clients.append(Sensor(
+                        name=sensor,
+                        project=project,
+                        datum=datum,
+                        setting=settings,
+                    ))
 
-                    self.clients[project][datum] = {
-                        'sensor': sensor,
-                        'settings': settings,
-                        'safe': False,
-                        'reasons': []
-                    }
-
-            # process the non-project-specific sensors
+            # process the project-agnostic sensors
             sensors = list(cfg.data['sensors'].keys())
             for sensor in sensors:
                 settings = cfg.get(f"sensors.{sensor}")
@@ -173,23 +144,16 @@ class Station(ABC):
                 if station != self.name or datum not in self.datums():
                     continue
 
-                if self.clients is None:
-                    self.clients = dict()
-                if 'default' not in self.clients:
-                    self.clients['default'] = dict()
-
-                self.clients['default'][datum] = {
-                    'sensor': sensor,
-                    'settings': settings,
-                    'safe': False,
-                    'reasons': []
-                }
+                self.clients.append(Sensor(
+                    name=sensor,
+                    project='default',
+                    datum=datum,
+                    setting=settings,
+                ))
 
         nreadings = 1
-        for project in self.clients.keys():
-            for sensor in self.clients[project].keys():
-                settings = self.clients[project][sensor]['settings']
-                nreadings = max(nreadings, settings['nreadings'])
+        for client in self.clients:
+            nreadings = max(nreadings, client.setting.nreadings)
         self.logger.info(f"Allocating a {nreadings} deep fifo")
         self.readings = FixedSizeFifo(nreadings)
 
