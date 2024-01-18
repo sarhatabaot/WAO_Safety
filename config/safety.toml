@@ -85,14 +85,14 @@
 
 
 #
-# The following sections define sensors that contribute to the safe/unsafe decision.
-# Each sensor contributes its safe/unsafe value.  The system is safe iff ALL the sensors are 'safe'.
+# The following sections define sensors that contribute to the is_safe/unsafe decision.
+# Each sensor contributes its is_safe/unsafe value.  The system is is_safe iff ALL the sensors are 'is_safe'.
 # Sensors can be:
 # - one-shot: ('nreadings' == 1, default if no 'nreadings'). Only the latest reading is considered
 # - cumulative: ('nreadings' > 1).  A number of readings are remembered
-#   - The sensor is 'safe' IFF all the readings are 'safe'
-#   - If the sensor changes from 'unsafe' to 'safe' it will remain 'unsafe' for a 'settling' [seconds] period to
-#      prevent jitter.  It will become safe ONLY if ALL readings are safe after the 'settling' period
+#   - The sensor is 'is_safe' IFF all the readings are 'is_safe'
+#   - If the sensor changes from 'unsafe' to 'is_safe' it will remain 'unsafe' for a 'settling' [seconds] period to
+#      prevent jitter.  It will become is_safe ONLY if ALL readings are is_safe after the 'settling' period
 #
 # Sensor attributes:
 # - 'source':       [station:value] where is it obtained from (e.g. davis:humidity)
@@ -100,29 +100,34 @@
 # - 'min', 'max':   [float, float)  the safety range.  (default: 'min' == 0)
 #
 [sensors.sun]           # The sun elevation [degrees]
+    enabled = true
     source = 'calculator:sun_elevation'
     dusk = -14.3 # [deg]
     dawn = -13.0 # [deg]
 
 [sensors.humidity]      # relative humidity [percent]
+    enabled = true
     max = 90
     source = "davis:inside_humidity"
     nreadings = 3
     settling = 600
 
 [sensors.wind-speed]    # [km/h]
+    enabled = true
     max = 40
     source = "davis:wind_speed"
     nreadings = 5
     settling = 800
 
 [sensors.cloud-cover]   # [percent]
+    enabled = true
     max = 45
     source = "tessw:cover"
     nreadings = 3
     settling = 600
 
 [sensors.dew-point]     # [centigrades]
+    enabled = true
     max = 15
     source = "davis:dewpoint"
     nreadings = 5
@@ -132,7 +137,8 @@
 # Projects may override sensor definitions, otherwise they'll get the defaults above
 #
 [last.sensors.wind-speed]
+    enabled = true
     max = 35                                # LAST is more sensitive to wind-speed
-    nreadings = 7                           # - needs more readings to decide if safe/unsafe
+    nreadings = 7                           # - needs more readings to decide if is_safe/unsafe
     source = "outside-arduino:wind_speed"   # - doesn't trust the davis station, prefers outside-arduino instead
-    settling = 800                          # - wants more time to settle down when transfering from unsafe to safe
+    settling = 800                          # - wants more time to settle down when transfering from unsafe to is_safe

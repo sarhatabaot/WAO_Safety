@@ -53,7 +53,7 @@ async def list_stations():
     return JSONResponse([station.name for station in stations])
 
 
-@app.get("/stations/{station_name}")
+@app.get("/stations/{station}")
 async def get_station(station_name: str):
     s = [s for s in stations if s.name == station_name]
     response = {

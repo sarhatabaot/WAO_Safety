@@ -54,7 +54,7 @@ class DeviceMeasuringConfig:
 
 class RangeSafetyChecker(SafetyChecker):
     """
-    A safety checker that decides that the weather is safe only if the
+    A safety checker that decides that the weather is is_safe only if the
     all the parameters are in the specified range for the specifies time.
     If more than one parameter is required from the same device, it chooses the
     minimal measuring interval, and adjusts the queue size such that it will have measurements
