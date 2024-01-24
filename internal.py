@@ -1,20 +1,25 @@
 from enum import Enum
 from typing import List
+import os
 
 from astropy.coordinates import get_sun, AltAz
 from astropy.time import Time
 from astropy import units as u
 from astropy.coordinates import EarthLocation
 
-from utils import cfg
-from station import Station, Reading
+from config.config import cfg
+from station import Station, Reading, Sensor
 
 
-class CalculatorDatum(str, Enum):
+class InternalDatum(str, Enum):
     SunElevation = "sun-elevation"
+    HumanIntervention = "human-intervention"
 
 
-class Calculator(Station):
+human_intervention_file = 'config/intervention.json'
+
+
+class Internal(Station):
 
     latitude: float
     longitude: float
@@ -29,7 +34,17 @@ class Calculator(Station):
         self.elevation = location['elevation']
 
     def datums(self) -> List[str]:
-        return list(CalculatorDatum.__members__.keys())
+        return list(InternalDatum.__members__.keys())
+
+    # def start(self):
+    #     for datum in [member.value for member in InternalDatum]:
+    #         new_sensor = Sensor(
+    #             name=datum,
+    #             project='default',
+    #             datum=datum,
+    #             default_settings=SensorSettings(d),
+    #             station=self,
+    #         )
 
     def fetcher(self) -> None:
         pass
@@ -39,7 +54,7 @@ class Calculator(Station):
 
     def latest(self, datum: str, n: int = 1):
 
-        if datum == "sun-elevation":
+        if datum == InternalDatum.SunElevation:
             now = Time.now()
             my_location = EarthLocation(lat=self.latitude * u.deg,
                                         lon=self.longitude * u.deg,
@@ -51,16 +66,18 @@ class Calculator(Station):
 
             # return elevation of the sun
             return sun_position.alt.value
-        
-    def start(self):
-        pass
 
+        elif datum == InternalDatum.HumanIntervention:
+            return os.path.exists(human_intervention_file)
+        
+    # def start(self):
+    #     pass
 
 
 if __name__ == "__main__":
-    calc = Calculator(name='calculator')
+    internal = Internal(name='internal')
     import time
 
     for _ in range(5):
-        print(f"elevation: {calc.latest('sun-elevation')}, sleeping 30 ...")
+        print(f"elevation: {internal.latest('sun-elevation')}, sleeping 30 ...")
         time.sleep(30)

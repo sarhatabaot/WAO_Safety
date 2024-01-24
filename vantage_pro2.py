@@ -4,7 +4,9 @@ from typing import List
 from enum import Enum
 
 from station import Reading, SerialStation
-from utils import cfg, SingletonFactory, init_log
+from utils import SingletonFactory
+from init_log import init_log
+from config.config import cfg
 
 
 class UnitConverter:
@@ -80,6 +82,8 @@ class LoopPacket:
         # Convert inch/100 to inch to mm
         # rain_rate = int.from_bytes(packet[41: 42], "little") / 100.0 * 25.4
         ret.datums[VantageProDatum.RainRate] = int.from_bytes(packet[41: 42], "little") / 100.0 * 25.4
+
+        ret.datums[VantageProDatum.UV] = packet[43]
 
         ret.tstamp = timestamp
         return ret

@@ -4,7 +4,9 @@ from typing import List
 from station import Reading, SerialStation
 from enum import Enum
 import logging
-from utils import cfg, SingletonFactory, init_log
+from utils import SingletonFactory
+from config.config import cfg
+from init_log import init_log
 from arduino import Arduino
 
 

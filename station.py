@@ -1,16 +1,57 @@
-import datetime
-import threading
+from __future__ import annotations
 
-from utils import FixedSizeFifo, cfg
+import datetime
+import logging
+import threading
+import time
 from abc import ABC, abstractmethod
-from typing import List, Dict
+from datetime import timedelta as td
+from typing import List
 
 import serial
-import logging
-import time
 
-from config.config import split_source
-from sensor import SensorSettings
+from init_log import init_log
+from sensor import SensorSettings, Sensor
+from utils import FixedSizeFifo
+from utils import Never
+
+# from config.config import cfg
+
+
+class StationSettings:
+    enabled: bool
+    interval: int  # seconds
+    interface: str
+    baud: int
+    host: str
+    port: int
+    nreadings: int
+
+    def __init__(self, d: dict):
+        self.enabled = d['enabled'] if 'enabled' in d else False
+        self.interface = d['interface'] if 'interface' in d else None
+        self.baud = d['baud'] if 'baud' in d else None
+        self.interval = d['interval'] if 'interval' in d else 60
+        self.host = d['host'] if 'host' in d else None
+        self.port = d['port'] if 'port' in d else None
+        self.nreadings = d['nreadings'] if 'nreadings' in d else 1
+
+
+class StationConfig:
+    name: str
+    settings: StationSettings
+
+
+class SafetyResponse:
+    """
+    The response from a **Sensor** when asked if it is is_safe
+    """
+    safe: bool          # Is it is_safe?
+    reasons: List[str]  # Why it is *unsafe*
+
+    def __init__(self, safe: bool = True, reasons: List[str] = None):
+        self.safe = safe
+        self.reasons = reasons if reasons is not None else list()
 
 
 class Reading:
@@ -19,30 +60,6 @@ class Reading:
 
     def __init__(self):
         self.datums = dict()
-
-
-class Sensor:
-    name: str
-    project: str
-    datum: str
-    is_safe: bool
-    was_safe: bool
-    is_settling: bool
-    became_safe: datetime.datetime
-    reasons: List[str]
-    settings: SensorSettings
-    settling_delta: datetime.timedelta
-
-    def __init__(self, name: str, project: str, datum: str, settings: SensorSettings):
-        self.name = name
-        self.project = project
-        self.datum = datum
-        self.is_safe = False
-        self.was_safe = False
-        self.is_settling = False
-        self.settings = settings
-        self.reasons = []
-        self.settling_delta = datetime.timedelta(seconds=settings.settling)
 
 
 class Station(ABC):
@@ -60,7 +77,7 @@ class Station(ABC):
     name: str
     interval: int
     readings: FixedSizeFifo
-    sensors: list
+    sensors: List[Sensor]
     logger: logging.Logger
 
     @classmethod
@@ -91,86 +108,37 @@ class Station(ABC):
 
         :param name: The **Station**'s name
         """
-        if name not in cfg.stations:
-            raise f"bad station name '{name}' (not one of {cfg.stations}, in '{cfg.filename}')"
+
+        from config.config import cfg
 
         if name not in cfg.enabled_stations:
             print(f"station {self.name} is not enabled in '{cfg.filename}'")
             return
 
         self.name = name
-        self.logger = logging.getLogger(f"station-{self.name}")
-        self.interval = cfg.get(f"stations.{self.name}.interval")
+        self.logger = logging.getLogger(self.name)
+        init_log(self.logger)
+        self.interval = cfg.stations[name].interval
         self.sensors = list()
+
+        nreadings = 1
+        for project in cfg.projects:
+            for sensor in cfg.sensors[project]:
+                if sensor.settings.station == self.name:
+                    existing = [s.name for s in self.sensors if s.name == sensor.name]
+                    if len(existing) == 0:
+                        self.sensors.append(sensor)
+                        nreadings = max(nreadings, sensor.settings.nreadings)
 
         self.lock = threading.Lock()
         self.stop_event = threading.Event()
         self.thread = threading.Thread(name="loop-thread",
                                        target=self.fetcher_loop)
 
-    def start(self):
-        """
-        At start() time a **Station** populates its sensors and starts the fetcher loop
-        """
-
-        # process the project-specific sensors
-        for project in cfg.get('global.projects'):
-            if project not in cfg.data or 'sensors' not in cfg.data[project]:
-                continue
-            sensors = cfg.data[project]['sensors'].keys()
-            for sensor in sensors:
-                defaults = {}
-                project_settings = cfg.get(f"{project}.{sensor}")
-                if sensor in cfg.data['sensors']:
-                    defaults = cfg.get(f"sensors.{sensor}")
-
-                d: Dict = dict()
-                if defaults is not None:
-                    d = defaults
-                if project_settings is not None:
-                    if d is not None:
-                        d.update(project_settings)
-                    else:
-                        d = project_settings
-
-                if 'enabled' not in d or not d['enabled']:
-                    continue
-                station, datum = split_source(d['source'])
-                if station != self.name or datum not in self.datums():
-                    continue
-
-                self.sensors.append(Sensor(
-                    name=sensor,
-                    project=project,
-                    datum=datum,
-                    settings=SensorSettings(d),
-                ))
-
-        # process the project-agnostic sensors
-        sensors = list(cfg.data['sensors'].keys())
-        for sensor in sensors:
-            d = cfg.get(f"sensors.{sensor}")
-
-            if 'enabled' not in d or not d['enabled']:
-                continue
-
-            station, datum = split_source(d['source'])
-            if station != self.name or datum not in self.datums():
-                continue
-
-            self.sensors.append(Sensor(
-                name=sensor,
-                project='default',
-                datum=datum,
-                settings=SensorSettings(d),
-            ))
-
-        nreadings = 1
-        for sensor in self.sensors:
-            nreadings = max(nreadings, sensor.settings.nreadings)
-        self.logger.info(f"Allocating a {nreadings} deep fifo")
+        self.logger.info(f"allocating fifo ({nreadings} deep)")
         self.readings = FixedSizeFifo(nreadings)
 
+    def start(self):
         if hasattr(self, 'fetcher'):
             self.thread.start()
 
@@ -188,7 +156,7 @@ class Station(ABC):
         while not self.stop_event.is_set():
             start_time = time.time()
             self.fetcher()
-            self.calculate_sensors()
+            self.calc()
             end_time = time.time()
             # sleep until end of interval
             remaining_time = self.interval - (end_time - start_time)
@@ -201,11 +169,9 @@ class Station(ABC):
         :param n: How many values
         :return: A list of values
         """
-        max_size = self.readings.max_size
         curr_size = len(self.readings.data)
         if n > curr_size:
-            raise Exception(f"station '{self.name}': not enough readings: wanted={n}, " +
-                            f"got only {curr_size} out of max={max_size}")
+            raise Exception(f"not enough readings: {curr_size} of {n}")
 
         current = list()
         with self.lock:
@@ -217,50 +183,65 @@ class Station(ABC):
     def all_readings(self) -> FixedSizeFifo:
         return self.readings
 
-    def calculate_sensors(self):
+    def calc(self):
+        """
+        Called each time a new reading is acquired from the station
+        """
         sensor: Sensor
+
         for sensor in self.sensors:
-            sensor.reasons = list()
             settings: SensorSettings = sensor.settings
+            reasons = list()  # start a fresh one
+
+            values = []
+            is_safe = True
             try:
                 # try to get the readings needed by the sensor
                 values = self.latest(settings.datum, settings.nreadings)
             except Exception as ex:
-                sensor.is_safe = False
-                sensor.reasons.append(f"{ex}")
-                continue
-
-            # check that the readings are in range
-            baddies = 0
-            for value in values:
-                if value >= settings.min or value > settings.max:
-                    baddies = baddies + 1
-
-            is_safe = False
-            if baddies > 0:
                 is_safe = False
-                sensor.reasons.append(
-                    f"{baddies} out of {settings.nreadings} are out of " +
-                    f"range (min={settings.min}, max={settings.max}")
-            else:
-                is_safe = True
-                if not sensor.was_safe:
-                    # the sensor just became safe
-                    if settings.settling is not None:
-                        # it has a settling period, start it now
-                        sensor.became_safe = datetime.datetime.now()
-                        is_safe = False
-                        sensor.reasons.append(
-                            f"started settling for {settings.settling} seconds")
-                elif sensor.became_safe:
-                    # a settling period was started
-                    delta = datetime.datetime.now() - sensor.became_safe
-                    if delta > sensor.settling_delta:
-                        # the settling period ended
-                        is_safe = True
-                        sensor.became_safe = None
+                reasons.append(f"{ex}")
 
-            sensor.is_safe = is_safe
+            if len(values) > 0:
+                # check that the readings are in range
+                baddies = 0
+                for value in values:
+                    if value < settings.min or value >= settings.max:
+                        baddies = baddies + 1
+
+                is_safe = True
+                if baddies > 0:
+                    is_safe = False
+                    reasons.append(
+                        f"{baddies} out of {settings.nreadings} are out of " +
+                        f"range (min={settings.min}, max={settings.max})")
+                else:
+                    if not sensor.previous_reading_was_safe:
+                        # the sensor just became safe
+                        if settings.settling is not None:
+                            # it has a settling period, start it now
+                            sensor.became_safe = datetime.datetime.now()
+                            is_safe = False
+                            reasons.append(
+                                f"started settling for {settings.settling} seconds")
+                    elif sensor.became_safe is not Never:
+                        # the settling period ended
+                        is_safe = sensor.has_settled()
+                        if not is_safe:
+                            end = sensor.became_safe + td(seconds=sensor.settings.settling)
+                            td_left = end - datetime.datetime.now()
+                            reasons.append(f"Settling for {td_left} more")
+
+            sensor.safe = is_safe
+            sensor.reasons = reasons
+            sensor.previous_reading_was_safe = is_safe
+
+            if sensor.safe:
+                msg = f"'{sensor.name}' is safe"
+            else:
+                why = ", ".join(sensor.reasons)
+                msg = f"'{sensor.name}' is not safe, {why}"
+            self.logger.debug(msg)
 
 
 class SerialStation(Station):
@@ -275,24 +256,23 @@ class SerialStation(Station):
     def __init__(self, name: str):
         super().__init__(name)
 
-        self.logger = logging.getLogger(f'SerialStation-{self.name}')
         config = cfg.get(f"stations.{name}")
         if config is None:
-            msg = f"Cannot get configuration for station='{name}' from '{cfg.filename}'"
+            msg = f"Cannot get configuration from '{cfg.filename}'"
             self.logger.error(msg)
             raise Exception(msg)
 
         if name not in cfg.enabled_stations:
-            msg = f"Station '{name}' not enabled in '{cfg.filename}'"
+            msg = f"not enabled in '{cfg.filename}'"
             self.logger.error(msg)
             raise Exception(msg)
 
         if 'interface' not in config:
-            msg = f"Missing 'interface' in configuration for station='{name}' in '{cfg.filename}'"
+            msg = f"Missing 'interface' in configuration '{cfg.filename}'"
             self.logger.error(msg)
             raise Exception(msg)
         if 'baud' not in config:
-            msg = f"Missing 'baud' in configuration for station='{name}' in '{cfg.filename}'"
+            msg = f"Missing 'baud' in configuration in '{cfg.filename}'"
             self.logger.error(msg)
             raise Exception(msg)
 
@@ -324,26 +304,26 @@ class HTTPStation(Station):
     def __init__(self, name: str):
         super().__init__(name=name)
 
-        self.logger = logging.getLogger(f'HTTPStation-{self.name}')
         config = cfg.get(f"stations.{name}")
         if config is None:
-            msg = f"Cannot get configuration for station='{name}' from '{cfg.filename}'"
+            msg = f"Cannot get configuration from '{cfg.filename}'"
             self.logger.error(msg)
             raise Exception(msg)
 
         if name not in cfg.enabled_stations:
-            msg = f"Station '{name}' not enabled in '{cfg.filename}'"
+            msg = f"not enabled in '{cfg.filename}'"
             self.logger.error(msg)
             raise Exception(msg)
 
         if 'host' not in config:
-            msg = f"Missing 'host' in configuration for station='{name}' in '{cfg.filename}'"
+            msg = f"Missing 'host' in configuration in '{cfg.filename}'"
             self.logger.error(msg)
             raise Exception(msg)
         if 'port' not in config:
-            msg = f"Missing 'port' in configuration for station='{name}' in '{cfg.filename}'"
+            msg = f"Missing 'port' in configuration in '{cfg.filename}'"
             self.logger.error(msg)
             raise Exception(msg)
+
         self.host = config['port']
         self.port = config['port']
         self.address = f"host={self.host}, port={self.port}"

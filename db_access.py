@@ -4,9 +4,7 @@ from sqlalchemy import create_engine, MetaData, Engine
 from sqlalchemy.ext.automap import automap_base
 from sqlalchemy.orm import Session
 
-from weather_measurement import WeatherMeasurement
-from weather_parameter import WeatherParameter
-from utils import cfg
+from config.config import cfg, DatabaseConfig
 from vantage_pro2 import VantageProReading, VantageProDatum
 from inside_arduino import InsideArduinoReading, InsideArduinoDatum
 from outside_arduino import OutsideArduinoReading, OutsideArduinoDatum
@@ -20,9 +18,9 @@ ArduinoOutDbClass = None
 
 class DbManager:
     def __init__(self):
-        conf = cfg.get('database')
-        self.schema = conf['schema']
-        self.db_url = f"postgresql+psycopg2://{conf['user']}:{conf['password']}@{conf['host']}/{conf['name']}"
+        conf = cfg.database
+        self.schema = conf.schema
+        self.db_url = f"postgresql+psycopg2://{conf.user}:{conf.password}@{conf.host}/{conf.name}"
 
         self.vantage_table_name = ""
         self.arduino_in_table_name = ""

@@ -1,10 +1,12 @@
 import datetime
-from utils import cfg
-from typing import Dict, List
-from config.config import split_source
+from utils import Never
+from typing import List, Any
+from utils import split_source
+from datetime import timedelta as td
 
 
 class SensorSettings:
+    enabled: bool
     project: str
     source: str
     min: float
@@ -26,6 +28,10 @@ class SensorSettings:
         self.settling = d['settling'] if 'settling' in d else None
         if self.source is not None:
             self.station, self.datum = split_source(self.source)
+        self.enabled = d['enabled'] if 'enabled' in d else False
+
+    def __repr__(self):
+        return f"{self.__dict__}"
 
 
 class Reading:
@@ -46,96 +52,37 @@ class SafetyResponse:
 
 
 class Sensor:
-    """
-    A **Sensor** is expected to produce a *is_safe*/*unsafe* decision at any given time
-
-    Different projects may have different settings for the sensor, in terms of:
-
-    * **source** - where does the sensor get the readings from (**station**:**datum**)
-    * **nreadings** - how many of the latest readings are needed for the decision
-    * **min**, **max** - the range in which a reading is considered *is_safe*
-    * **settling** - settling time [seconds] during which the sensor remains *unsafe* after all the relevant readings have become *is_safe*
-    """
-
-    # station: Station
-    enabled: bool = False
+    name: str
+    previous_reading_was_safe: bool = False
+    became_safe: datetime.datetime = Never
+    reasons: List[str]
     settings: SensorSettings
+    station: Any
+    safe: bool = False
 
-    def __init__(self, name: str):
+    def __init__(self,
+                 name: str,
+                 settings: SensorSettings):
         self.name = name
+        self.previous_reading_was_safe = False
+        self.settings = settings
+        self.reasons = []
+        if hasattr(settings, 'settling') and settings.settling is not None:
+            self.settling_delta = td(seconds=settings.settling)
 
-        self.settings = dict()
-        self.settings["default"] = cfg.get(f"sensors.{self.name}")
-        self.check_and_set_source(project="default", source=self.settings["default"]['source'])
-        for project in cfg.projects:
-            setting = cfg.get(f"{project}.sensors.{self.name}")
-            if setting is not None:
-                self.settings[project] = setting
+    def __repr__(self):
+        return f"Sensor(name='{self.name}', settings={self.settings}"
 
-    def check_and_set_source(self, project: str, source: str):
-        msg = f"Bad source '{source}' for sensor '{self.name}'  (project='{project}'): "
-        if source is None:
-            raise msg + "empty"
-
-        src = source.split(":")
-        if len(src) != 2:
-            raise msg + "Not station:datum"
-
-        station_name = src[0]
-        datum_name = src[1]
-        if station_name not in cfg.enabled_stations:
-            raise msg + f"Station '{station_name}' is not enabled"
-        station_cfg = cfg.get(f"stations.{station_name}")
-        if station_cfg is None:
-            raise msg + f"No configuration for station='{station_name}"
-
-        # station = [s for s in stations if s.name == station]
-        # if station is None:
-        #     raise f"Cannot find station named '{station}' in stations"
-
-        # station = station[0]
-        # datum_names = station.datums()
-        # if datum not in datum_names:
-        #     raise msg + f"Datum '{datum} is not one of the datums for station '{station}'"
-
-        self.settings[project].source = source
-        # self.settings[project].station = station
-        self.settings[project].datum = datum_name
-
-    def is_safe(self, project="default") -> SafetyResponse:
-        setting = self.settings[project]
-        out_of_range = f"out of range min={setting.min}, max={setting.max}"
-
-        try:
-            readings = setting.station.latest(setting.datum, setting.nreadings)
-        except Exception as ex:
-            return SafetyResponse(False, [f"{ex}"])
-
-        if setting.nreadings == 1:
-            # it's a one-shot sensor, just one relevant reading
-            if setting.min <= readings[0] > setting.max:
-                return SafetyResponse(False, reasons=[out_of_range])
-            else:
-                return SafetyResponse()
-
-        bad_readings = 0
-        for reading in readings:
-            if setting.min < reading >= setting.max:
-                bad_readings = bad_readings + 1
-
-        if bad_readings == 0:
-            # it is actually is_safe, but is it settling?
-            if setting.became_safe is not None:
-                td = datetime.datetime.now() - setting.became_safe
-                if td.seconds > setting.settling:
-                    # no bad readings (is_safe) and enough time passed since it became_safe, we're good
-                    setting.became_safe = None
-                    setting.was_safe = True
-                    return SafetyResponse()
-                else:
-                    td = datetime.timedelta(seconds=setting.settling) - td
-                    return SafetyResponse(False, [f"settling ({td} out of {setting.settling} to go)"])
-        else:   # some bad readings
-            if setting.was_safe:
-                setting.was_safe = False
-            return SafetyResponse(False, [f"{bad_readings} readings are " + out_of_range])
+    def has_settled(self) -> bool:
+        """
+        Checks if the sensor's settling period has ended
+        :return:
+        """
+        needed_settling = (datetime.datetime.now() - self.became_safe)
+        if needed_settling <= self.settling_delta:
+            self.reasons.append(f"Is settling, for {needed_settling} more")
+            return False
+        else:
+            self.station.logger.info(f"'{self.name}' ended settling period")
+            self.became_safe = Never
+            return True

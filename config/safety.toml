@@ -23,7 +23,7 @@
         "outside-arduino",  # Outside Arduino
         "cyclope",          # The Cyclope seeing monitor
         "tessw",            # The TESS-W cloud-cover monitor
-        "calculator",       # A station that performs internal calculations
+        "internal",         # A station that performs internal calculations
     ]
 
 [location]                  # Geographical location (assumes all projects are in the same location)
@@ -77,12 +77,17 @@
     host = "x.y.z.w"
     port = 12345
     interval = 60
+    # enabled = true
 
 [stations.tessw]
     host = "x.y.z.w"
     port = 12345
     interval = 60
+    # enabled = true
 
+[stations.internal]
+    enabled = true      # hardcoded, cannot be disabled
+    interval = 10
 
 #
 # The following sections define sensors that contribute to the is_safe/unsafe decision.
@@ -101,7 +106,7 @@
 #
 [sensors.sun]           # The sun elevation [degrees]
     enabled = true
-    source = 'calculator:sun_elevation'
+    source = 'internal:sun_elevation'
     dusk = -14.3 # [deg]
     dawn = -13.0 # [deg]
 
@@ -140,5 +145,5 @@
     enabled = true
     max = 35                                # LAST is more sensitive to wind-speed
     nreadings = 7                           # - needs more readings to decide if is_safe/unsafe
-    source = "outside-arduino:wind_speed"   # - doesn't trust the davis station, prefers outside-arduino instead
+    source = "davis:wind_speed"             # - doesn't trust the davis station, prefers outside-arduino instead
     settling = 800                          # - wants more time to settle down when transfering from unsafe to is_safe
