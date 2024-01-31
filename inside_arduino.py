@@ -2,37 +2,14 @@ import datetime
 import logging
 from typing import List
 
-from station import Reading, SerialStation
-from enum import Enum
-from utils import SingletonFactory
+from station import SerialStation
 from config.config import cfg
 from init_log import init_log
 from arduino import Arduino
+from db_access import db_manager
+from utils import InsideArduinoDatum, InsideArduinoReading
 
 
-class InsideArduinoDatum(str, Enum):
-    TemperatureIn = "temperature_in",
-    PressureIn = "pressure_in",
-    VisibleLuxIn = "visible_lux_in",
-    Presence = "presence",
-    Flame = "flame",
-    CO2 = "co2",
-    RawH2 = "raw_h2",
-    RawEthanol = "raw_ethanol",
-    VOC = "voc",
-    
-    @classmethod
-    def names(cls) -> list:
-        return [item.value for item in cls]
-
-    
-class InsideArduinoReading(Reading):
-    def __init__(self):
-        super().__init__()
-        for name in InsideArduinoDatum.names():
-            self.datums[name] = None
-            
-    
 class InsideArduino(SerialStation, Arduino):
     def __init__(self, name: str):
         self.name = name
@@ -45,13 +22,7 @@ class InsideArduino(SerialStation, Arduino):
             self.logger.error(f"Cannot construct SerialStation for '{self.name}'", exc_info=ex)
             return
 
-        config = cfg.get(f"stations.{self.name}")
-        self.interval = config['interval'] if 'interval' in config else 60
-
-        from db_access import DbManager
-        self.db_manager = SingletonFactory.get_instance(DbManager)
-        self.db_manager.connect()
-        self.db_manager.open_session()
+        self.interval = cfg.stations[self.name].interval
 
     def get_correct_file(self) -> str:
         return "Indoor_multiQuery.ino"
@@ -60,6 +31,8 @@ class InsideArduino(SerialStation, Arduino):
         return [item.value for item in InsideArduinoDatum]
 
     def fetcher(self) -> None:
+        print(f"{self.name} fetcher is bypassed")
+        return
         reading = InsideArduinoReading()
 
         try:
@@ -94,8 +67,8 @@ class InsideArduino(SerialStation, Arduino):
             tstamp=reading.tstamp,
         )
 
-        self.db_manager.session.add(arduino_in)
-        self.db_manager.session.commit()
+        db_manager.session.add(arduino_in)
+        db_manager.session.commit()
 
     def get_light(self, reading: InsideArduinoReading):
         response = self.query("light", 0.08, "light (Lux): {f}")

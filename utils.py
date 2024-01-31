@@ -1,13 +1,17 @@
 import json
-from threading import Timer, Event, Lock
-
+import os.path
+from threading import Timer, Event
 import datetime
 from json import JSONEncoder
 from fastapi.responses import JSONResponse
 from typing import Any, NamedTuple
+from enum import Enum
 
 default_port = 8000
 Never = datetime.datetime.min
+
+SunElevationSensorName = "sun-sensor"
+HumanInterventionSensorName = "human-intervention"
 
 
 class RepeatTimer(Timer):
@@ -106,3 +110,100 @@ class SingletonFactory:
             class_type.__init__(instance, *args, **kwargs)
             cls._instances[class_type] = instance
         return cls._instances[class_type]
+
+
+class Reading:
+    datums: dict
+    tstamp: datetime.datetime
+
+    def __init__(self):
+        self.datums = dict()
+
+
+class VantageProDatum(str, Enum):
+    Barometer = "barometer",
+    InsideTemperature = "inside_temperature",
+    InsideHumidity = "inside_humidity",
+    OutsideTemperature = "outside_temperature",
+    WindSpeed = "wind_speed",
+    WindDirection = "wind_direction",
+    OutSideHumidity = "outside_humidity",
+    RainRate = "rain_rate",
+    UV = "uv",
+    SolarRadiation = "solar_radiation",
+
+    @classmethod
+    def datums(cls):
+        return [item.value for item in cls]
+
+
+class VantageProReading(Reading):
+    def __init__(self):
+        super().__init__()
+        for name in VantageProDatum.datums():
+            self.datums[name] = None
+
+
+class OutsideArduinoDatum(str, Enum):
+    TemperatureOut = "temperature_out",
+    HumidityOut = "humidity_out",
+    PressureOut = "pressure_out",
+    DewPoint = "dew_point",
+    VisibleLuxOut = "visible_lux_out",
+    IrLuminosity = "ir_luminosity",
+    WindSpeed = "wind_speed",
+    WindDirection = "wind_direction",
+
+    @classmethod
+    def names(cls) -> list:
+        return [item.value for item in cls]
+
+
+class OutsideArduinoReading(Reading):
+    def __init__(self):
+        super().__init__()
+        for name in OutsideArduinoDatum.names():
+            self.datums[name] = None
+
+
+class InsideArduinoDatum(str, Enum):
+    TemperatureIn = "temperature_in",
+    PressureIn = "pressure_in",
+    VisibleLuxIn = "visible_lux_in",
+    Presence = "presence",
+    Flame = "flame",
+    CO2 = "co2",
+    RawH2 = "raw_h2",
+    RawEthanol = "raw_ethanol",
+    VOC = "voc",
+
+    @classmethod
+    def names(cls) -> list:
+        return [item.value for item in cls]
+
+
+class InsideArduinoReading(Reading):
+    def __init__(self):
+        super().__init__()
+        for name in InsideArduinoDatum.names():
+            self.datums[name] = None
+
+
+class HumanIntervention:
+    filename: str
+
+    def __init__(self):
+        self.filename = '/home/ocs/python/WeatherSafety/config/human_intervention.json'
+
+    def is_safe(self):
+        return os.path.exists(self.filename)
+
+    def create(self, reason: str):
+        with open(self.filename, 'w') as file:
+            file.write(json.dumps({
+                'tstamp': datetime.datetime.now(),
+                'reason': reason
+            }, indent=2))
+
+    def delete(self):
+        os.unlink(self.filename)

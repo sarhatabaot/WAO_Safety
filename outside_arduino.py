@@ -1,35 +1,13 @@
 import datetime
 from typing import List
 
-from station import Reading, SerialStation
-from enum import Enum
+from station import SerialStation
 import logging
-from utils import SingletonFactory
+from utils import OutsideArduinoReading, OutsideArduinoDatum
 from config.config import cfg
 from init_log import init_log
 from arduino import Arduino
-
-
-class OutsideArduinoDatum(str, Enum):
-    TemperatureOut = "temperature_out",
-    HumidityOut = "humidity_out",
-    PressureOut = "pressure_out",
-    DewPoint = "dew_point",
-    VisibleLuxOut = "visible_lux_out",
-    IrLuminosity = "ir_luminosity",
-    WindSpeed = "wind_speed",
-    WindDirection = "wind_direction",
-    
-    @classmethod
-    def names(cls) -> list:
-        return [item.value for item in cls]
-
-
-class OutsideArduinoReading(Reading):
-    def __init__(self):
-        super().__init__()
-        for name in OutsideArduinoDatum.names():
-            self.datums[name] = None
+from db_access import db_manager
 
 
 class OutsideArduino(SerialStation, Arduino):
@@ -43,19 +21,15 @@ class OutsideArduino(SerialStation, Arduino):
             self.logger.error(f"Cannot construct SerialStation for '{self.name}'", exc_info=ex)
             return
 
-        config = cfg.get(f"stations.{self.name}")
-        self.interval = config['interval'] if 'interval' in config else 60
-
-        from db_access import DbManager
-        self.db_manager = SingletonFactory.get_instance(DbManager)
-        self.db_manager.connect()
-        self.db_manager.open_session()
+        self.interval = cfg.stations[self.name].interval
 
     @classmethod
     def datums(cls) -> List[str]:
         return [item.value for item in OutsideArduinoDatum]
 
     def fetcher(self) -> None:
+        print(f"{self.name}: fetcher is bypassed")
+        return
         reading: OutsideArduinoReading = OutsideArduinoReading()
 
         try:
@@ -86,8 +60,8 @@ class OutsideArduino(SerialStation, Arduino):
             tstamp=reading.tstamp
         )
 
-        self.db_manager.session.add(arduino_out)
-        self.db_manager.session.commit()
+        db_manager.session.add(arduino_out)
+        db_manager.session.commit()
 
     def get_wind(self, reading: OutsideArduinoReading):
         wind_results = self.query("wind", 0.05, "v={f} m/s  dir. {f}°")

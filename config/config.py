@@ -1,14 +1,39 @@
 import logging
-import os.path
 from typing import List, Dict
 from copy import deepcopy
 
 import tomlkit
 
 from init_log import init_log
-from sensor import Sensor, SensorSettings
-from station import StationSettings
-from utils import split_source
+from sensor import Sensor, MinMaxSettings, HumanInterventionSettings, SunElevationSettings
+from utils import split_source, SunElevationSensorName, HumanInterventionSensorName
+
+logger: logging.Logger = logging.getLogger('config')
+init_log(logger)
+
+
+class StationSettings:
+    enabled: bool
+    interval: int  # seconds
+    interface: str
+    baud: int
+    host: str
+    port: int
+    nreadings: int
+
+    def __init__(self, d: dict):
+        self.enabled = d['enabled'] if 'enabled' in d else False
+        self.interface = d['interface'] if 'interface' in d else None
+        self.baud = d['baud'] if 'baud' in d else None
+        self.interval = d['interval'] if 'interval' in d else 60
+        self.host = d['host'] if 'host' in d else None
+        self.port = d['port'] if 'port' in d else None
+        self.nreadings = d['nreadings'] if 'nreadings' in d else 1
+
+
+class StationConfig:
+    name: str
+    settings: StationSettings
 
 
 class LocationConfig:
@@ -38,7 +63,7 @@ class DatabaseConfig:
     password: str
     schema: str
 
-    def __init__(self, d):
+    def __init__(self, d: dict):
         self.host = d['host']
         self.name = d['name']
         self.user = d['user']
@@ -47,6 +72,7 @@ class DatabaseConfig:
 
 
 class Config:
+    filename: str
     toml: dict
     projects: List[str]
     stations: Dict[str, StationSettings]
@@ -64,109 +90,115 @@ class Config:
         self.sensors = {'default': list()}
         self.stations_in_use = list()
         self.toml = {}
-        self.database = DatabaseConfig({})
-        self.location = LocationConfig({})
-        self.server = ServerConfig({})
+        self.enabled_stations = list()
+        self.filename = '/home/ocs/python/WeatherSafety/config/safety.toml'
+
+        with open(self.filename, 'r') as file:
+            self.toml = deepcopy(tomlkit.load(file))
+
+        self.database = DatabaseConfig(self.toml['database'])
+        self.server = ServerConfig(self.toml['server'])
+        self.location = LocationConfig(self.toml['location'])
+
+        for name in list(self.toml['stations'].keys()):
+            self.stations[name] = StationSettings(self.toml['stations'][name])
+
+        for key in self.stations.keys():
+            if self.stations[key].enabled:
+                self.enabled_stations.append(key)
+
+        for ll in [self.stations.keys(), self.enabled_stations, self.stations_in_use]:
+            if 'internal' not in ll:
+                ll.insert(0, 'internal')
+
+        self.projects = self.toml['global']['projects']
+        for project_name in self.projects:
+            self.sensors[project_name] = list()
+
+        for sensor_name in self.toml['sensors']:
+            # scan the default sensors
+            settings_dict = self.toml['sensors'][sensor_name]
+            enabled = settings_dict['enabled'] if 'enabled' in settings_dict else False
+            if not enabled:
+                logger.info(f"project 'default': skipping '{sensor_name}' (not enabled)")
+                continue
+            station_name, datum = split_source(settings_dict['source'])
+            settings_dict['station'] = station_name
+            settings_dict['datum'] = datum
+            if station_name not in self.enabled_stations:
+                logger.info(f"project: 'default': skipping '{sensor_name}' (station '{station_name}' not enabled)")
+                continue
+
+            if sensor_name == SunElevationSensorName:
+                settings = SunElevationSettings(settings_dict)
+            elif sensor_name == HumanInterventionSensorName:
+                settings = HumanInterventionSettings(settings_dict)
+            else:
+                settings = MinMaxSettings(settings_dict)
+
+            settings.project = 'default'
+            new_sensor = Sensor(
+                name=sensor_name,
+                settings=settings,
+            )
+            logger.info(f"project: 'default', adding '{new_sensor.name}'")
+            self.sensors['default'].append(new_sensor)
+
+        # copy all default sensors to the projects
+        for project in self.projects:
+            self.sensors[project] = deepcopy(self.sensors['default'])
+            for s in self.sensors[project]:
+                s.settings.project = project
+
+        # look for project-specific sensors and override them
+        for project in self.projects:
+            if project in self.toml and 'sensors' in self.toml[project]:
+                for sensor_name in self.toml[project]['sensors']:
+                    project_dict = self.toml[project]['sensors'][sensor_name]
+                    sensor = [s for s in self.sensors[project] if s.name == sensor_name]
+                    if len(sensor) > 0:  # this sensor is one of the default sensors
+                        sensor = sensor[0]
+                        sensor.settings.__dict__.update(project_dict)
+                        if sensor.settings.station not in self.enabled_stations:
+                            sensor.settings.enabled = False
+                    else:  # this sensor is defined for this project only
+                        if sensor_name == SunElevationSensorName:
+                            settings = SunElevationSettings(project_dict)
+                        elif sensor_name == HumanInterventionSensorName:
+                            settings = HumanInterventionSettings(project_dict)
+                        else:
+                            settings = MinMaxSettings(project_dict)
+                        self.sensors[project].append(
+                            Sensor(name=project_dict['name'], settings=settings))
+
+        # make a list of all the station which are enabled and used by at least one sensor
+        for project in ['default'] + self.projects:
+            for s in self.sensors[project]:
+                if not s.settings.enabled:
+                    continue
+                if s.settings.station not in self.enabled_stations:
+                    s.settings.enabled = False
+                    continue
+                if s.settings.station not in self.stations_in_use:
+                    self.stations_in_use.append(s.settings.station)
+        self.dump()
+
+    def dump(self):
+        print("")
+        print("stations:")
+        print(f"  all:     {list(self.stations.keys())}")
+        print(f"  enabled: {self.enabled_stations}")
+        print(f"  in use:  {self.stations_in_use}")
+        print("")
+        print("sensors (per project):")
+        print("")
+        for project in ['default'] + self.projects:
+            for sensor in self.sensors[project]:
+                print(f"  {project:8s} {sensor}")
+            print()
 
 
 cfg = Config()
 
-logger: logging.Logger = logging.getLogger('config')
-init_log(logger)
-
-
-def initialize():
-    global cfg
-
-    with open(os.path.realpath('../config/safety.toml'), 'r') as file:
-        cfg.toml = deepcopy(tomlkit.load(file))
-
-    cfg.database = DatabaseConfig(cfg.toml['database'])
-    for name in list(cfg.toml['stations'].keys()):
-        cfg.stations[name] = StationSettings(cfg.toml['stations'][name])
-
-    for key in cfg.stations.keys():
-        if cfg.stations[key].enabled:
-            cfg.enabled_stations.append(key)
-
-    for ll in [cfg.stations.keys(), cfg.enabled_stations, cfg.stations_in_use]:
-        if 'internal' not in ll:
-            ll.insert(0, 'internal')
-
-    cfg.projects = cfg.toml['global']['projects']
-    for project_name in cfg.projects:
-        cfg.sensors[project_name] = list()
-
-    for sensor_name in cfg.toml['sensors']:
-        # scan the default sensors
-        settings_dict = cfg.toml['sensors'][sensor_name]
-        enabled = settings_dict['enabled'] if 'enabled' in settings_dict else False
-        if not enabled:
-            logger.info(f"project 'default': skipping '{sensor_name}' (not enabled)")
-            continue
-        station_name, datum = split_source(settings_dict['source'])
-        settings_dict['station'] = station_name
-        settings_dict['datum'] = datum
-        if station_name not in cfg.enabled_stations:
-            logger.info(f"project: 'default': skipping '{sensor_name}' (station '{station_name}' not enabled)")
-            continue
-
-        settings = SensorSettings(settings_dict)
-        settings.project = 'default'
-        new_sensor = Sensor(
-            name=sensor_name,
-            settings=settings,
-        )
-        logger.info(f"project: 'default', adding '{new_sensor.name}'")
-        cfg.sensors['default'].append(new_sensor)
-
-    # copy all default sensors to the projects
-    for project in cfg.projects:
-        cfg.sensors[project] = deepcopy(cfg.sensors['default'])
-        for s in cfg.sensors[project]:
-            s.settings.project = project
-
-    # look for project-specific sensors and override them
-    for project in cfg.projects:
-        if project in cfg.toml and 'sensors' in cfg.toml[project]:
-            for sensor_name in cfg.toml[project]['sensors']:
-                project_dict = cfg.toml[project]['sensors'][sensor_name]
-                sensor = [s for s in cfg.sensors[project] if s.name == sensor_name]
-                if len(sensor) > 0:  # this sensor is one of the default sensors
-                    sensor = sensor[0]
-                    sensor.settings.__dict__.update(project_dict)
-                    if sensor.settings.station not in cfg.enabled_stations:
-                        sensor.settings.enabled = False
-                else:   # this sensor is defined for this project only
-                    cfg.sensors[project].append(
-                        Sensor(name=project_dict['name'],
-                               settings=SensorSettings(project_dict)))
-
-    # make a list of all the station which are enabled and used by at least one sensor
-    for project in ['default'] + cfg.projects:
-        for s in cfg.sensors[project]:
-            if not s.settings.enabled:
-                continue
-            if s.settings.station not in cfg.enabled_stations:
-                s.settings.enabled = False
-                continue
-            if s.settings.station not in cfg.stations_in_use:
-                cfg.stations_in_use.append(s.settings.station)
-
-
-def dump_cfg():
-    global cfg
-
-    print(f"stations: {cfg.stations.keys()}")
-    print(f"stations in use: {cfg.stations_in_use}")
-    print(f"enabled stations: {cfg.enabled_stations}")
-    print()
-    for project in ['default'] + cfg.projects:
-        for sensor in cfg.sensors[project]:
-            print(f"{project:6s} {sensor}")
-        print()
-
-
 if __name__ == "__main__":
-    initialize()
-    dump_cfg()
+    cfg.dump()

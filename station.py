@@ -15,31 +15,7 @@ from sensor import SensorSettings, Sensor
 from utils import FixedSizeFifo
 from utils import Never
 
-# from config.config import cfg
-
-
-class StationSettings:
-    enabled: bool
-    interval: int  # seconds
-    interface: str
-    baud: int
-    host: str
-    port: int
-    nreadings: int
-
-    def __init__(self, d: dict):
-        self.enabled = d['enabled'] if 'enabled' in d else False
-        self.interface = d['interface'] if 'interface' in d else None
-        self.baud = d['baud'] if 'baud' in d else None
-        self.interval = d['interval'] if 'interval' in d else 60
-        self.host = d['host'] if 'host' in d else None
-        self.port = d['port'] if 'port' in d else None
-        self.nreadings = d['nreadings'] if 'nreadings' in d else 1
-
-
-class StationConfig:
-    name: str
-    settings: StationSettings
+from config.config import cfg
 
 
 class SafetyResponse:
@@ -202,35 +178,38 @@ class Station(ABC):
                 is_safe = False
                 reasons.append(f"{ex}")
 
-            if len(values) > 0:
-                # check that the readings are in range
-                baddies = 0
-                for value in values:
-                    if value < settings.min or value >= settings.max:
-                        baddies = baddies + 1
-
-                is_safe = True
-                if baddies > 0:
-                    is_safe = False
-                    reasons.append(
-                        f"{baddies} out of {settings.nreadings} are out of " +
-                        f"range (min={settings.min}, max={settings.max})")
+            if values is not None:
+                if settings.nreadings == 1 and hasattr(self, 'is_safe') and callable(self.is_safe):
+                    is_safe = self.is_safe(values[0], settings)
                 else:
-                    if not sensor.previous_reading_was_safe:
-                        # the sensor just became safe
-                        if settings.settling is not None:
-                            # it has a settling period, start it now
-                            sensor.became_safe = datetime.datetime.now()
-                            is_safe = False
-                            reasons.append(
-                                f"started settling for {settings.settling} seconds")
-                    elif sensor.became_safe is not Never:
-                        # the settling period ended
-                        is_safe = sensor.has_settled()
-                        if not is_safe:
-                            end = sensor.became_safe + td(seconds=sensor.settings.settling)
-                            td_left = end - datetime.datetime.now()
-                            reasons.append(f"Settling for {td_left} more")
+                    # check that the readings are in range
+                    baddies = 0
+                    for value in values:
+                        if value < settings.min or value >= settings.max:
+                            baddies = baddies + 1
+
+                    is_safe = True
+                    if baddies > 0:
+                        is_safe = False
+                        reasons.append(
+                            f"{baddies} out of {settings.nreadings} are out of " +
+                            f"range (min={settings.min}, max={settings.max})")
+                    else:
+                        if not sensor.previous_reading_was_safe:
+                            # the sensor just became safe
+                            if settings.settling is not None:
+                                # it has a settling period, start it now
+                                sensor.became_safe = datetime.datetime.now()
+                                is_safe = False
+                                reasons.append(
+                                    f"started settling for {settings.settling} seconds")
+                        elif sensor.became_safe is not Never:
+                            # the settling period ended
+                            is_safe = sensor.has_settled()
+                            if not is_safe:
+                                end = sensor.became_safe + td(seconds=sensor.settings.settling)
+                                td_left = end - datetime.datetime.now()
+                                reasons.append(f"Settling for {td_left} more")
 
             sensor.safe = is_safe
             sensor.reasons = reasons
@@ -256,8 +235,8 @@ class SerialStation(Station):
     def __init__(self, name: str):
         super().__init__(name)
 
-        config = cfg.get(f"stations.{name}")
-        if config is None:
+        settings = cfg.stations[name]
+        if settings is None:
             msg = f"Cannot get configuration from '{cfg.filename}'"
             self.logger.error(msg)
             raise Exception(msg)
@@ -267,17 +246,17 @@ class SerialStation(Station):
             self.logger.error(msg)
             raise Exception(msg)
 
-        if 'interface' not in config:
+        if settings.interface is None:
             msg = f"Missing 'interface' in configuration '{cfg.filename}'"
             self.logger.error(msg)
             raise Exception(msg)
-        if 'baud' not in config:
+        if settings.baud is None:
             msg = f"Missing 'baud' in configuration in '{cfg.filename}'"
             self.logger.error(msg)
             raise Exception(msg)
 
-        self.port = config['interface']
-        self.baud = config['baud']
+        self.port = settings.interface
+        self.baud = settings.baud
         self.address = f"port={self.port}, baud={self.baud}"
         try:
             self.ser = serial.Serial(self.port, self.baud)
@@ -304,8 +283,8 @@ class HTTPStation(Station):
     def __init__(self, name: str):
         super().__init__(name=name)
 
-        config = cfg.get(f"stations.{name}")
-        if config is None:
+        settings = cfg.get(f"stations.{name}")
+        if settings is None:
             msg = f"Cannot get configuration from '{cfg.filename}'"
             self.logger.error(msg)
             raise Exception(msg)
@@ -315,17 +294,17 @@ class HTTPStation(Station):
             self.logger.error(msg)
             raise Exception(msg)
 
-        if 'host' not in config:
+        if settings.host is None:
             msg = f"Missing 'host' in configuration in '{cfg.filename}'"
             self.logger.error(msg)
             raise Exception(msg)
-        if 'port' not in config:
+        if settings.port:
             msg = f"Missing 'port' in configuration in '{cfg.filename}'"
             self.logger.error(msg)
             raise Exception(msg)
 
-        self.host = config['port']
-        self.port = config['port']
+        self.host = settings.port
+        self.port = settings.port
         self.address = f"host={self.host}, port={self.port}"
 
     def fetcher(self) -> None:

@@ -4,8 +4,8 @@ from sqlalchemy import create_engine, MetaData, Engine
 from sqlalchemy.ext.automap import automap_base
 from sqlalchemy.orm import Session
 
-from config.config import cfg, DatabaseConfig
-from vantage_pro2 import VantageProReading, VantageProDatum
+from config.config import cfg
+from utils import VantageProReading, VantageProDatum
 from inside_arduino import InsideArduinoReading, InsideArduinoDatum
 from outside_arduino import OutsideArduinoReading, OutsideArduinoDatum
 
@@ -52,7 +52,8 @@ class DbManager:
         self.session = Session(self.engine)
 
     def close_session(self):
-        self.session.close()
+        if self.session is not None:
+            self.session.close()
 
     def __del__(self):
         self.close_session()
@@ -107,3 +108,8 @@ class DbManager:
 
         self.session.add(arduino_out)
         self.session.commit()
+
+
+db_manager = DbManager()
+db_manager.connect()
+db_manager.open_session()

@@ -1,3 +1,4 @@
+import datetime
 from enum import Enum
 from typing import List
 import os
@@ -8,7 +9,9 @@ from astropy import units as u
 from astropy.coordinates import EarthLocation
 
 from config.config import cfg
-from station import Station, Reading, Sensor
+from station import Station, Reading
+from sensor import SensorSettings
+from utils import HumanIntervention
 
 
 class InternalDatum(str, Enum):
@@ -16,35 +19,24 @@ class InternalDatum(str, Enum):
     HumanIntervention = "human-intervention"
 
 
-human_intervention_file = 'config/intervention.json'
-
-
 class Internal(Station):
 
     latitude: float
     longitude: float
     elevation: float
+    human_intervention: HumanIntervention
 
     def __init__(self, name: str):
         self.name = name
         super().__init__(name=self.name)
-        location = cfg.get('location')
-        self.latitude = location['latitude']
-        self.longitude = location['longitude']
-        self.elevation = location['elevation']
+        location = cfg.location
+        self.latitude = location.latitude
+        self.longitude = location.longitude
+        self.elevation = location.elevation
+        self.human_intervention = HumanIntervention()
 
     def datums(self) -> List[str]:
         return list(InternalDatum.__members__.keys())
-
-    # def start(self):
-    #     for datum in [member.value for member in InternalDatum]:
-    #         new_sensor = Sensor(
-    #             name=datum,
-    #             project='default',
-    #             datum=datum,
-    #             default_settings=SensorSettings(d),
-    #             station=self,
-    #         )
 
     def fetcher(self) -> None:
         pass
@@ -70,8 +62,19 @@ class Internal(Station):
         elif datum == InternalDatum.HumanIntervention:
             return os.path.exists(human_intervention_file)
         
-    # def start(self):
-    #     pass
+    def is_safe(self, value, settings) -> bool:
+        if settings.datum == InternalDatum.SunElevation:
+            if not (hasattr(settings, 'dawn') and hasattr(settings, 'dusk')):
+                raise Exception(f"Missing 'dusk' or 'dawn' in {settings}")
+            elevation = self.latest(InternalDatum.SunElevation)
+            hour = datetime.datetime.now().hour
+            if hour >= 12:
+                return elevation >= settings.dusk
+            else:
+                return elevation < settings.dawn
+
+        elif settings.datum == InternalDatum.HumanIntervention:
+            return self.human_intervention.is_safe()
 
 
 if __name__ == "__main__":

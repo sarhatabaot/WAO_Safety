@@ -115,5 +115,5 @@ def is_safe(project: str = None) -> SafetyResponse:
 if __name__ == "__main__":
     import uvicorn
 
-    config = cfg.get('server')
-    uvicorn.run("main:app", host=config['host'], port=config['port'], reload=True)
+    svr = cfg.server
+    uvicorn.run("main:app", host=svr.host, port=svr.port, reload=True)

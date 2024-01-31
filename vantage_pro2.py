@@ -4,9 +4,10 @@ from typing import List
 from enum import Enum
 
 from station import Reading, SerialStation
-from utils import SingletonFactory
+from utils import VantageProDatum, VantageProReading
 from init_log import init_log
 from config.config import cfg
+from db_access import db_manager
 
 
 class UnitConverter:
@@ -18,25 +19,25 @@ class UnitConverter:
     def mph_to_kph(speed_mph):
         return speed_mph / 1.60934
 
-
-class VantageProDatum(str, Enum):
-    Barometer = "barometer",
-    InsideTemperature = "inside_temperature",
-    InsideHumidity = "inside_humidity",
-    OutsideTemperature = "outside_temperature",
-    WindSpeed = "wind_speed",
-    WindDirection = "wind_direction",
-    OutSideHumidity = "outside_humidity",
-    RainRate = "rain_rate",
-    UV = "uv",
-    SolarRadiation = "solar_radiation",
-
-
-class VantageProReading(Reading):
-    def __init__(self):
-        super().__init__()
-        for name in VantagePro2.datums():
-            self.datums[name] = None
+#
+# class VantageProDatum(str, Enum):
+#     Barometer = "barometer",
+#     InsideTemperature = "inside_temperature",
+#     InsideHumidity = "inside_humidity",
+#     OutsideTemperature = "outside_temperature",
+#     WindSpeed = "wind_speed",
+#     WindDirection = "wind_direction",
+#     OutSideHumidity = "outside_humidity",
+#     RainRate = "rain_rate",
+#     UV = "uv",
+#     SolarRadiation = "solar_radiation",
+#
+#
+# class VantageProReading(Reading):
+#     def __init__(self):
+#         super().__init__()
+#         for name in VantagePro2.datums():
+#             self.datums[name] = None
 
 
 class LoopPacket:
@@ -148,12 +149,7 @@ class VantagePro2(SerialStation):
         super().__init__(name=name)
         self.logger = logging.getLogger(self.name)
         init_log(self.logger)
-        self.interval = cfg.data['interval'] if 'interval' in cfg.data else 60
-
-        from db_access import DbManager
-        self.db_manager = SingletonFactory.get_instance(DbManager)
-        self.db_manager.connect()
-        self.db_manager.open_session()
+        self.interval = cfg.stations[self.name].interval
 
     @classmethod
     def datums(cls) -> List[str]:
@@ -168,6 +164,8 @@ class VantagePro2(SerialStation):
         return [item.value for item in VantageProDatum]
 
     def fetcher(self):
+        print(f"{self.name}: fetcher is bypassed")
+        return
         try:
             if not self.__wakeup():
                 self.logger.error("could not wake-up station")
@@ -200,8 +198,8 @@ class VantagePro2(SerialStation):
             tstamp=reading.tstamp,
         )
 
-        self.db_manager.session.add(davis)
-        self.db_manager.session.commit()
+        db_manager.session.add(davis)
+        db_manager.session.commit()
 
     def check_right_port(self) -> bool:
         # wakeup if sleeping

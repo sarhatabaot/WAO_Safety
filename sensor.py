@@ -1,7 +1,6 @@
 import datetime
-from utils import Never
 from typing import List, Any
-from utils import split_source
+from utils import split_source, Never
 from datetime import timedelta as td
 
 
@@ -9,29 +8,55 @@ class SensorSettings:
     enabled: bool
     project: str
     source: str
+    station: str
+    datum: str
+    was_safe: bool
+    became_safe: datetime.datetime
+
+    def __init__(self, d: dict):
+        self.enabled = d['enabled'] if 'enabled' in d else False
+        self.project = d['project'] if 'project' in d else "default"
+        self.source = d['source'] if 'source' in d else None
+        if self.source is not None:
+            self.station, self.datum = split_source(self.source)
+        self.became_safe = Never
+        self.was_safe = False
+
+    def __repr__(self):
+        return f"{self.__dict__}"
+
+
+class HumanInterventionSettings(SensorSettings):
+    human_intervention_file: str
+
+    def __init__(self, d: dict):
+        super().__init__(self, d)
+        self.human_intervention_file = d['human-intervention-file'] \
+            if 'human-intervention-file' in d else None
+
+
+class SunElevationSettings(SensorSettings):
+    dusk: float  # [degrees]
+    dawn: float  # [degrees]
+
+    def __init__(self, d: dict):
+        super().__init__(self, d)
+        self.dawn = d['dawn'] if 'dawn' in d else None
+        self.dusk = d['dusk'] if 'dusk' in d else None
+
+
+class MinMaxSettings(SensorSettings):
     min: float
     max: float
     settling: float
     nreadings: int
-    station: str
-    datum: str
-    was_safe: bool = False
-    became_safe: datetime.datetime = None
 
     def __init__(self, d: dict):
-        self.project = d['project'] if 'project' in d else "default"
-        self.source = d['source'] if 'source' in d else None
+        super().__init__(self, d)
         self.min = d['min'] if 'min' in d else 0
-        self.max = d['max'] if 'max' in d else None
-        self.nreadings = d['nreadings'] if 'nreadings' in d else 1
-        self.source = d['source'] if 'source' in d else None
+        self.max = d['max'] if 'max' in d else (2 ** 32 - 1)
         self.settling = d['settling'] if 'settling' in d else None
-        if self.source is not None:
-            self.station, self.datum = split_source(self.source)
-        self.enabled = d['enabled'] if 'enabled' in d else False
-
-    def __repr__(self):
-        return f"{self.__dict__}"
+        self.nreadings = d['nreadings'] if 'nreadings' in d else 1
 
 
 class Reading:
