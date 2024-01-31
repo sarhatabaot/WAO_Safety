@@ -52,7 +52,7 @@ class MinMaxSettings(SensorSettings):
     nreadings: int
 
     def __init__(self, d: dict):
-        super().__init__(self, d)
+        SensorSettings.__init__(self, d)
         self.min = d['min'] if 'min' in d else 0
         self.max = d['max'] if 'max' in d else (2 ** 32 - 1)
         self.settling = d['settling'] if 'settling' in d else None

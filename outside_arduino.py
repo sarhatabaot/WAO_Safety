@@ -7,7 +7,7 @@ from utils import OutsideArduinoReading, OutsideArduinoDatum
 from config.config import cfg
 from init_log import init_log
 from arduino import Arduino
-from db_access import db_manager
+# from db_access import db_manager
 
 
 class OutsideArduino(SerialStation, Arduino):
@@ -60,6 +60,7 @@ class OutsideArduino(SerialStation, Arduino):
             tstamp=reading.tstamp
         )
 
+        from db_access import db_manager
         db_manager.session.add(arduino_out)
         db_manager.session.commit()
 

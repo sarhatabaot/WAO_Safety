@@ -6,8 +6,8 @@ from station import SerialStation
 from config.config import cfg
 from init_log import init_log
 from arduino import Arduino
-from db_access import db_manager
 from utils import InsideArduinoDatum, InsideArduinoReading
+# from db_access import db_manager
 
 
 class InsideArduino(SerialStation, Arduino):
@@ -67,6 +67,7 @@ class InsideArduino(SerialStation, Arduino):
             tstamp=reading.tstamp,
         )
 
+        from db_access import db_manager
         db_manager.session.add(arduino_in)
         db_manager.session.commit()
 
