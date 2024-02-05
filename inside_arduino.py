@@ -1,16 +1,20 @@
 import datetime
 import logging
 from typing import List
+import serial
 
 from station import SerialStation
-from config.config import cfg
+from config.config import make_cfg
 from init_log import init_log
 from arduino import Arduino
-from db_access import db_manager
+from db_access import make_db_manager, DbManager
 from utils import InsideArduinoDatum, InsideArduinoReading
 
 
 class InsideArduino(SerialStation, Arduino):
+
+    db_manager: DbManager
+
     def __init__(self, name: str):
         self.name = name
         self.logger = logging.getLogger(self.name)
@@ -22,7 +26,9 @@ class InsideArduino(SerialStation, Arduino):
             self.logger.error(f"Cannot construct SerialStation for '{self.name}'", exc_info=ex)
             return
 
-        self.interval = cfg.stations[self.name].interval
+        cfg = make_cfg()
+        self.interval = cfg.station_settings[self.name].interval
+        self.db_manager = make_db_manager()
 
     def get_correct_file(self) -> str:
         return "Indoor_multiQuery.ino"
@@ -31,8 +37,17 @@ class InsideArduino(SerialStation, Arduino):
         return [item.value for item in InsideArduinoDatum]
 
     def fetcher(self) -> None:
-        print(f"{self.name} fetcher is bypassed")
-        return
+        # print(f"{self.name} fetcher is bypassed")
+        # return
+
+        try:
+            self.ser = serial.Serial(port=self.port, baudrate=self.baud,
+                                     timeout=self.timeout, write_timeout=self.write_timeout)
+        except serial.serialutil.SerialException as ex:
+            self.logger.error(f"Could not open '{self.port}", exc_info=ex)
+            self.ser.close()
+            return
+
         reading = InsideArduinoReading()
 
         try:
@@ -42,14 +57,18 @@ class InsideArduino(SerialStation, Arduino):
             self.get_flame(reading)
             self.get_presence(reading)
             self.get_light(reading)
+            self.ser.close()
         except Exception as ex:
             self.logger.error(f"fetcher: Failed", exc_info=ex)
-            return
+            self.ser.close()
+            raise
 
         reading.tstamp = datetime.datetime.utcnow()
-        self.readings.push(reading)
-        if hasattr(self, 'saver'):
-            self.saver(reading)
+        self.logger.debug(f"reading: {reading.__dict__}")
+        with self.lock:
+            self.readings.push(reading)
+        # if hasattr(self, 'saver'):
+        #     self.saver(reading)
 
     def saver(self, reading: InsideArduinoReading) -> None:
         from db_access import ArduinoInDbClass
@@ -67,14 +86,17 @@ class InsideArduino(SerialStation, Arduino):
             tstamp=reading.tstamp,
         )
 
-        db_manager.session.add(arduino_in)
-        db_manager.session.commit()
+        self.db_manager.session.add(arduino_in)
+        self.db_manager.session.commit()
 
     def get_light(self, reading: InsideArduinoReading):
         response = self.query("light", 0.08, "light (Lux): {f}")
         reading.datums[InsideArduinoDatum.VisibleLuxIn] = response[0]
 
     def get_pressure(self, reading: InsideArduinoReading):
+        if reading is None:
+            return
+
         response = self.query("pressure", 0.1, "Pressure: {f}hPa")
         reading.datums[InsideArduinoDatum.PressureIn] = response[0]
 
@@ -83,6 +105,9 @@ class InsideArduino(SerialStation, Arduino):
         reading.datums[InsideArduinoDatum.TemperatureIn] = response[0]
 
     def get_gas(self, reading: InsideArduinoReading):
+        if reading is None:
+            return
+
         response = self.query("gas", 0.07, "CO2: {i} ppm\tTVOC: {i} ppb\tRaw H2: {i} \tRaw Ethanol: {i}")
         reading.datums[InsideArduinoDatum.CO2] = response[0]
         reading.datums[InsideArduinoDatum.VOC] = response[1]
@@ -90,6 +115,9 @@ class InsideArduino(SerialStation, Arduino):
         reading.datums[InsideArduinoDatum.RawEthanol] = response[3]
 
     def get_flame(self, reading: InsideArduinoReading):
+        if reading is None:
+            return
+
         response = self.query("flame", 0.05, "IR reading: {i}")
         reading.datums[InsideArduinoDatum.Flame] = response[0]
 

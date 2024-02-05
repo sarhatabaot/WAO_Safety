@@ -4,14 +4,26 @@ from threading import Timer, Event
 import datetime
 from json import JSONEncoder
 from fastapi.responses import JSONResponse
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, List
 from enum import Enum
 
 default_port = 8000
 Never = datetime.datetime.min
 
-SunElevationSensorName = "sun-sensor"
+SunElevationSensorName = "sun"
 HumanInterventionSensorName = "human-intervention"
+
+
+class SafetyResponse:
+    """
+    The response from a **Sensor** when asked if it is is_safe
+    """
+    safe: bool          # Is it is_safe?
+    reasons: List[str]  # Why it is *unsafe*
+
+    def __init__(self, safe: bool = True, reasons: List[str] = None):
+        self.safe = safe
+        self.reasons = reasons if reasons is not None else list()
 
 
 class RepeatTimer(Timer):
@@ -101,15 +113,15 @@ class Singleton:
         return cls._instance
 
 
-class SingletonFactory:
-    _instances = {}
-
-    def __new__(cls, class_type, *args, **kwargs):
-        if class_type not in cls._instances:
-            instance = super().__new__(class_type)
-            class_type.__init__(instance, *args, **kwargs)
-            cls._instances[class_type] = instance
-        return cls._instances[class_type]
+# class SingletonFactory:
+#     _instances = {}
+#
+#     def __new__(cls, class_type, *args, **kwargs):
+#         if class_type not in cls._instances:
+#             instance = super().__new__(class_type)
+#             class_type.__init__(instance, *args, **kwargs)
+#             cls._instances[class_type] = instance
+#         return cls._instances[class_type]
 
 
 class Reading:
@@ -189,21 +201,39 @@ class InsideArduinoReading(Reading):
             self.datums[name] = None
 
 
+class HumanInterventionFileContent:
+    reason: str
+    tstamp: datetime.datetime
+
+
 class HumanIntervention:
     filename: str
 
-    def __init__(self):
-        self.filename = '/home/ocs/python/WeatherSafety/config/human_intervention.json'
+    def __init__(self, human_intervention_file: str):
+        self.filename = human_intervention_file # '/home/ocs/python/WeatherSafety/config/human_intervention.json'
 
-    def is_safe(self):
-        return os.path.exists(self.filename)
+    def is_safe(self) -> SafetyResponse:
+        response = SafetyResponse()
+        if os.path.exists(self.filename):
+            response.safe = False
+            with open(self.filename) as f:
+                content = json.load(f)
+            response.reasons.append(f"sensor 'human-intervention', reason='{content['reason']}', from={content['tstamp']}")
+        return response
 
     def create(self, reason: str):
         with open(self.filename, 'w') as file:
-            file.write(json.dumps({
+            json.dump({
                 'tstamp': datetime.datetime.now(),
                 'reason': reason
-            }, indent=2))
+            }, file, indent=2, cls=DateTimeEncoder)
 
-    def delete(self):
-        os.unlink(self.filename)
+    def remove(self):
+        os.remove(self.filename)
+
+
+def formatted_float_list(ll: list, fmt: str = ".2f") -> str:
+    formatted_values = [f"{v:{fmt}}" for v in ll]
+    formatted_values = '[' + ", ".join(formatted_values) + ']'
+
+    return formatted_values

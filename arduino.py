@@ -35,6 +35,8 @@ class Arduino(ABC):
         time.sleep(wait)
 
         response_txt = self.ser.readline().decode("utf-8")
+        if response_txt is None:
+            raise Exception(f"readline() timed-out after {self.ser.timeout} seconds")
 
         # TODO: Find reason for echo
         while response_txt == request_txt:

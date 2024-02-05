@@ -1,16 +1,20 @@
 import datetime
 from typing import List
+import serial
 
 from station import SerialStation
 import logging
 from utils import OutsideArduinoReading, OutsideArduinoDatum
-from config.config import cfg
+from config.config import make_cfg
 from init_log import init_log
 from arduino import Arduino
-from db_access import db_manager
+from db_access import make_db_manager, DbManager
 
 
 class OutsideArduino(SerialStation, Arduino):
+
+    db_manager: DbManager
+
     def __init__(self, name: str):
         self.name = name
         self.logger = logging.getLogger(self.name)
@@ -21,29 +25,42 @@ class OutsideArduino(SerialStation, Arduino):
             self.logger.error(f"Cannot construct SerialStation for '{self.name}'", exc_info=ex)
             return
 
-        self.interval = cfg.stations[self.name].interval
+        cfg = make_cfg()
+        self.interval = cfg.station_settings[self.name].interval
+        self.db_manager = make_db_manager()
 
     @classmethod
     def datums(cls) -> List[str]:
         return [item.value for item in OutsideArduinoDatum]
 
     def fetcher(self) -> None:
-        print(f"{self.name}: fetcher is bypassed")
-        return
+        # print(f"{self.name}: fetcher is bypassed")
+        # return
         reading: OutsideArduinoReading = OutsideArduinoReading()
+        try:
+            self.ser = serial.Serial(port=self.port, baudrate=self.baud,
+                                     timeout=self.timeout, write_timeout=self.write_timeout)
+        except Exception as ex:
+            self.logger.error(f"Could not open '{self.port}", exc_info=ex)
+            self.ser.close()
+            return
 
         try:
             self.get_wind(reading)
             self.get_light(reading)
             self.get_pressure_humidity_temperature(reading)
+            self.ser.close()
         except Exception as ex:
             self.logger.error(f"Failed to get readings", exc_info=ex)
+            self.ser.close()
             return
 
         reading.tstamp = datetime.datetime.utcnow()
-        self.readings.push(reading)
-        if hasattr(self, 'saver'):
-            self.saver(reading)
+        self.logger.debug(f"reading: {reading.__dict__}")
+        with self.lock:
+            self.readings.push(reading)
+        # if hasattr(self, 'saver'):
+        #     self.saver(reading)
 
     def saver(self, reading: OutsideArduinoReading) -> None:
         from db_access import ArduinoOutDbClass
@@ -60,8 +77,8 @@ class OutsideArduino(SerialStation, Arduino):
             tstamp=reading.tstamp
         )
 
-        db_manager.session.add(arduino_out)
-        db_manager.session.commit()
+        self.db_manager.session.add(arduino_out)
+        self.db_manager.session.commit()
 
     def get_wind(self, reading: OutsideArduinoReading):
         wind_results = self.query("wind", 0.05, "v={f} m/s  dir. {f}°")

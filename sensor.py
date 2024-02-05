@@ -10,7 +10,6 @@ class SensorSettings:
     source: str
     station: str
     datum: str
-    was_safe: bool
     became_safe: datetime.datetime
 
     def __init__(self, d: dict):
@@ -20,7 +19,6 @@ class SensorSettings:
         if self.source is not None:
             self.station, self.datum = split_source(self.source)
         self.became_safe = Never
-        self.was_safe = False
 
     def __repr__(self):
         return f"{self.__dict__}"
@@ -28,9 +26,10 @@ class SensorSettings:
 
 class HumanInterventionSettings(SensorSettings):
     human_intervention_file: str
+    nreadings: int = 1
 
     def __init__(self, d: dict):
-        super().__init__(self, d)
+        SensorSettings.__init__(self, d)
         self.human_intervention_file = d['human-intervention-file'] \
             if 'human-intervention-file' in d else None
 
@@ -38,9 +37,10 @@ class HumanInterventionSettings(SensorSettings):
 class SunElevationSettings(SensorSettings):
     dusk: float  # [degrees]
     dawn: float  # [degrees]
+    nreadings: int = 1
 
     def __init__(self, d: dict):
-        super().__init__(self, d)
+        SensorSettings.__init__(self, d)
         self.dawn = d['dawn'] if 'dawn' in d else None
         self.dusk = d['dusk'] if 'dusk' in d else None
 
@@ -52,7 +52,7 @@ class MinMaxSettings(SensorSettings):
     nreadings: int
 
     def __init__(self, d: dict):
-        super().__init__(self, d)
+        SensorSettings.__init__(self, d)
         self.min = d['min'] if 'min' in d else 0
         self.max = d['max'] if 'max' in d else (2 ** 32 - 1)
         self.settling = d['settling'] if 'settling' in d else None
@@ -64,34 +64,24 @@ class Reading:
     time: datetime.datetime
 
 
-class SafetyResponse:
-    """
-    The response from a **Sensor** when asked if it is is_safe
-    """
-    safe: bool          # Is it is_safe?
-    reasons: List[str]  # Why it is *unsafe*
-
-    def __init__(self, safe: bool = True, reasons: List[str] = None):
-        self.safe = safe
-        self.reasons = reasons
-
-
 class Sensor:
     name: str
-    previous_reading_was_safe: bool = False
-    became_safe: datetime.datetime = Never
+    started_settling: datetime.datetime = Never
     reasons: List[str]
     settings: SensorSettings
     station: Any
     safe: bool = False
+    values: List[float]
+    # id: int
 
     def __init__(self,
                  name: str,
                  settings: SensorSettings):
+        # self.id = id(self)
         self.name = name
-        self.previous_reading_was_safe = False
         self.settings = settings
-        self.reasons = []
+        self.values = list()
+        self.reasons = list()
         if hasattr(settings, 'settling') and settings.settling is not None:
             self.settling_delta = td(seconds=settings.settling)
 
@@ -103,11 +93,38 @@ class Sensor:
         Checks if the sensor's settling period has ended
         :return:
         """
-        needed_settling = (datetime.datetime.now() - self.became_safe)
+        needed_settling = (datetime.datetime.now() - self.started_settling)
         if needed_settling <= self.settling_delta:
             self.reasons.append(f"Is settling, for {needed_settling} more")
             return False
         else:
             self.station.logger.info(f"'{self.name}' ended settling period")
-            self.became_safe = Never
+            self.started_settling = Never
             return True
+
+    def values_out_of_range(self, values=None) -> int:
+        # check if the supplied (or existing) values are in range
+        if not hasattr(self.settings, 'nreadings'):
+            return 0
+
+        if values is None:
+            values = self.values
+
+        if isinstance(self.settings, SunElevationSettings):
+            return 0  # TODO
+        elif isinstance(self.settings, HumanInterventionSettings):
+            return 0  # TODO
+        elif isinstance(self.settings, MinMaxSettings):
+
+            if isinstance(values, (int, float)):
+                return values < self.settings.min or values >= self.settings.max
+
+            if len(self.values) != self.settings.nreadings:
+                return 0
+
+            bad = 0
+            for v in values:
+                if v < self.settings.min or v >= self.settings.max:
+                    bad = bad + 1
+
+            return bad

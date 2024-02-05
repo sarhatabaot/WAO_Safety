@@ -45,70 +45,86 @@
     #   - If not specified, enabled == false
     #
 [stations.davis]
-    # datums:
-    #  barometer, inside_temperature, inside_humidity,
-    #  outside_temperature, wind_speed, wind_direction,
-    #  outside_humidity, rain_rate, uv, solar_radiation
-    interface = "/dev/ttyUSB0"
+     datums = [
+        "barometer", "inside_temperature", "inside_humidity",
+        "outside_temperature", "wind_speed", "wind_direction",
+        "outside_humidity", "rain_rate", "uv", "solar_radiation"
+    ]
+    serial = "/dev/ttyUSB0"
     baud = 19200
+    timeout = 5
     interval = 60
     enabled = true
 
 [stations.inside-arduino]
-    # datums:
-    #   temperature_in, pressure_in, visible_lux_in,
-    #   presence, flame, co2, raw_h2, raw_ethanol, voc
-    interface = "/dev/ttyUSB1"
+     datums = [
+        "temperature_in", "pressure_in", "visible_lux_in",
+        "presence", "flame", "co2", "raw_h2", "raw_ethanol", "voc"
+    ]
+    serial = "/dev/ttyUSB1"
     baud = 115200
+    timeout = 2
     interval = 60
-    # enabled = true
+    enabled = true
 
 [stations.outside-arduino]
-    # datums:
-    #   temperature_out, humidity_out, pressure_out,
-    #   dew_point, visible_lux_out, ir_luminosity,
-    #   wind_speed, wind_direction
-    interface = "/dev/ttyACM1"
+     datums = [
+        "temperature_out", "humidity_out", "pressure_out",
+        "dew_point", "visible_lux_out", "ir_luminosity",
+        "wind_speed", "wind_direction"
+    ]
+    serial = "/dev/ttyACM0"
     baud = 115200
+    timeout = 2
     interval = 60
-    # enabled = true
+    enabled = true
 
 [stations.cyclope]
+    datums = ["seeing_zenith", "R0"]
     host = "x.y.z.w"
     port = 12345
     interval = 60
     # enabled = true
 
 [stations.tessw]
+    datums = ["cover"]
     host = "x.y.z.w"
     port = 12345
     interval = 60
     # enabled = true
 
 [stations.internal]
+    datums = [ "sun-elevation", "human-intervention" ]
     enabled = true      # hardcoded, cannot be disabled
-    interval = 10
+    interval = 30
+    human-intervention-file = "config/human_intervention.json"
 
 #
 # The following sections define sensors that contribute to the is_safe/unsafe decision.
 # Each sensor contributes its is_safe/unsafe value.  The system is is_safe iff ALL the sensors are 'is_safe'.
 # Sensors can be:
 # - one-shot: ('nreadings' == 1, default if no 'nreadings'). Only the latest reading is considered
-# - cumulative: ('nreadings' > 1).  A number of readings are remembered
-#   - The sensor is 'is_safe' IFF all the readings are 'is_safe'
+# - cumulative: ('nreadings' > 1).  A number of values are remembered
+#   - The sensor is 'is_safe' IFF all the values are 'is_safe'
 #   - If the sensor changes from 'unsafe' to 'is_safe' it will remain 'unsafe' for a 'settling' [seconds] period to
-#      prevent jitter.  It will become is_safe ONLY if ALL readings are is_safe after the 'settling' period
+#      prevent jitter.  It will become is_safe ONLY if ALL values are is_safe after the 'settling' period
 #
 # Sensor attributes:
 # - 'source':       [station:value] where is it obtained from (e.g. davis:humidity)
-# - 'nreadings':    [int]           how many readings are remembered (default: 1)
+# - 'nreadings':    [int]           how many values are remembered (default: 1)
 # - 'min', 'max':   [float, float)  the safety range.  (default: 'min' == 0)
 #
-[sensors.sun]           # The sun elevation [degrees]
+[sensors.sun]           # The sun-elevation [degrees]
     enabled = true
-    source = 'internal:sun_elevation'
+    source = 'internal:sun-elevation'
     dusk = -14.3 # [deg]
     dawn = -13.0 # [deg]
+
+[sensors.human-intervention]
+    # Not safe if 'filename' exists (e.g. for maintenance)
+    enabled = true
+    source ="internal:human-intervention"
+    filename = "config/human_intervention.json"
 
 [sensors.humidity]      # relative humidity [percent]
     enabled = true
@@ -134,7 +150,7 @@
 [sensors.dew-point]     # [centigrades]
     enabled = true
     max = 15
-    source = "davis:dewpoint"
+    source = "outside-arduino:dew_point"
     nreadings = 5
     settling = 600
 
@@ -144,6 +160,12 @@
 [last.sensors.wind-speed]
     enabled = true
     max = 35                                # LAST is more sensitive to wind-speed
-    nreadings = 7                           # - needs more readings to decide if is_safe/unsafe
+    nreadings = 7                           # - needs more values to decide if is_safe/unsafe
     source = "davis:wind_speed"             # - doesn't trust the davis station, prefers outside-arduino instead
     settling = 800                          # - wants more time to settle down when transfering from unsafe to is_safe
+
+[mast.sensors.sun]                          # MAST uses different dawn/dusk sun elevations
+    enabled = true
+    source = 'internal:sun-elevation'
+    dusk = -17 # [deg]
+    dawn = -12 # [deg]

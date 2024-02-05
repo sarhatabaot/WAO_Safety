@@ -97,3 +97,5 @@ dmypy.json
 
 # FastAPI specific
 *.db
+
+config/human_intervention.json

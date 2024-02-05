@@ -154,9 +154,9 @@ class DeviceFactory:
         #             device = DeviceName(device_str)
         #             devices.append(device)
 
-        stations = cfg.datums['stations'].keys()
+        stations = cfg.datums['station_settings'].keys()
         for station in stations:
-            enabled = cfg.datums['stations'][station]['enabled']
+            enabled = cfg.datums['station_settings'][station]['enabled']
             if enabled:
                 devices.append(station)
 

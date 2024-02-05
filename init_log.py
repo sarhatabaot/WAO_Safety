@@ -105,16 +105,20 @@ class DailyFileHandler(logging.FileHandler):
 def init_log(logger: logging.Logger):
     logger.propagate = False
     logger.setLevel(default_log_level)
-    handler = logging.StreamHandler()
-    handler.setLevel(default_log_level)
-    formatter = logging.Formatter(
-        '%(asctime)s - %(levelname)-8s ' +
-        '- {%(name)s:%(funcName)s:%(process)d:%(threadName)s:%(thread)s}' +
-        ' -  %(message)s')
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
 
-    handler = DailyFileHandler(path=path_maker.make_logfile_name(), mode='a')
-    handler.setLevel(default_log_level)
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
+    formatter = logging.Formatter(
+            '%(asctime)s - %(levelname)-8s ' +
+            '- {%(name)s:%(funcName)s:%(process)d:%(threadName)s:%(thread)s}' +
+            ' -  %(message)s')
+
+    if not any(isinstance(h, logging.StreamHandler) for h in logger.handlers):
+        handler = logging.StreamHandler()
+        handler.setLevel(default_log_level)
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+
+    if not any(isinstance(h, DailyFileHandler) for h in logger.handlers):
+        handler = DailyFileHandler(path=path_maker.make_logfile_name(), mode='a')
+        handler.setLevel(default_log_level)
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)

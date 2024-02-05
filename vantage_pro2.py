@@ -3,11 +3,13 @@ import logging
 from typing import List
 from enum import Enum
 
+import serial
+
 from station import Reading, SerialStation
 from utils import VantageProDatum, VantageProReading
 from init_log import init_log
-from config.config import cfg
-from db_access import db_manager
+from config.config import make_cfg
+from db_access import make_db_manager, DbManager
 
 
 class UnitConverter:
@@ -18,26 +20,6 @@ class UnitConverter:
     @staticmethod
     def mph_to_kph(speed_mph):
         return speed_mph / 1.60934
-
-#
-# class VantageProDatum(str, Enum):
-#     Barometer = "barometer",
-#     InsideTemperature = "inside_temperature",
-#     InsideHumidity = "inside_humidity",
-#     OutsideTemperature = "outside_temperature",
-#     WindSpeed = "wind_speed",
-#     WindDirection = "wind_direction",
-#     OutSideHumidity = "outside_humidity",
-#     RainRate = "rain_rate",
-#     UV = "uv",
-#     SolarRadiation = "solar_radiation",
-#
-#
-# class VantageProReading(Reading):
-#     def __init__(self):
-#         super().__init__()
-#         for name in VantagePro2.datums():
-#             self.datums[name] = None
 
 
 class LoopPacket:
@@ -144,12 +126,17 @@ class LoopPacket:
 
 class VantagePro2(SerialStation):
 
+    db_manager: DbManager
+
     def __init__(self, name: str):
         self.name = name
         super().__init__(name=name)
         self.logger = logging.getLogger(self.name)
         init_log(self.logger)
-        self.interval = cfg.stations[self.name].interval
+
+        cfg = make_cfg()
+        self.interval = cfg.station_settings[self.name].interval
+        self.db_manager = make_db_manager()
 
     @classmethod
     def datums(cls) -> List[str]:
@@ -164,23 +151,36 @@ class VantagePro2(SerialStation):
         return [item.value for item in VantageProDatum]
 
     def fetcher(self):
-        print(f"{self.name}: fetcher is bypassed")
-        return
+        # print(f"{self.name}: fetcher is bypassed")
+        # return
         try:
-            if not self.__wakeup():
-                self.logger.error("could not wake-up station")
-                return
+            self.ser = serial.Serial(port=self.port, baudrate=self.baud, timeout=self.timeout,
+                                     write_timeout=self.write_timeout)
+        except Exception as ex:
+            self.logger.error(f"Could not open '{self.port}'", exc_info=ex)
+            self.ser.close()
+            return
+
+        try:
+            self.__wakeup()
+        except Exception as ex:
+            self.logger.error("failed to wake up the station", exc_info=ex)
+            self.ser.close()
+            return
+
+        try:
             reading = self.__loop()
             self.logger.info("got LOOP packet")
         except Exception as ex:
             self.logger.error("failed to get a LOOP packet", exc_info=ex)
+            self.ser.close()
             return
 
         if reading:
             with self.lock:
                 self.readings.push(reading)
-            if hasattr(self, 'saver'):
-                self.saver(reading)
+            # if hasattr(self, 'saver'):
+            #     self.saver(reading)
 
     def saver(self, reading: VantageProReading) -> None:
         from db_access import DavisDbClass
@@ -198,8 +198,8 @@ class VantagePro2(SerialStation):
             tstamp=reading.tstamp,
         )
 
-        db_manager.session.add(davis)
-        db_manager.session.commit()
+        self.db_manager.session.add(davis)
+        self.db_manager.session.commit()
 
     def check_right_port(self) -> bool:
         # wakeup if sleeping
@@ -225,11 +225,14 @@ class VantagePro2(SerialStation):
         for _ in range(wakeup_attempts):
             try:
                 self.ser.write(b"\n")
-                response = self.ser.read(len(expected_response))
             except Exception as ex:
                 self.logger.error(f"failed to wakeup station", exc_info=ex)
-                return False
+                raise
 
+            response = self.ser.read(len(expected_response))
+            # response = self.ser.read(1024)
+            if len(response) == 0:
+                raise Exception(f"Could not read {len(expected_response)} bytes in {self.ser.timeout} seconds")
             return response == expected_response
 
         return False
@@ -260,11 +263,17 @@ class VantagePro2(SerialStation):
     def __loop(self):
         try:
             self.ser.write(b"LOOP 1\n")
-            self.ser.read(1)
-            loop_bytes = self.ser.read(99)
         except Exception as ex:
             self.logger.error(f"failed to send/receive a LOOP packet", exc_info=ex)
             return
+
+        ack = self.ser.read(1)
+        if len(ack) != 1:
+            raise Exception(f"No ACK after sending 'LOOP 1'")
+
+        loop_bytes = self.ser.read(99)
+        if len(loop_bytes) != 99:
+            raise Exception(f"Could not read 99 LOOP bytes (got only {len(loop_bytes)})")
 
         return LoopPacket.parse(loop_bytes, datetime.datetime.utcnow())
 

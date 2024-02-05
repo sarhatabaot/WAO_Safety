@@ -4,11 +4,10 @@ from sqlalchemy import create_engine, MetaData, Engine
 from sqlalchemy.ext.automap import automap_base
 from sqlalchemy.orm import Session
 
-from config.config import cfg
+from config.config import make_cfg
 from utils import VantageProReading, VantageProDatum
-from inside_arduino import InsideArduinoReading, InsideArduinoDatum
-from outside_arduino import OutsideArduinoReading, OutsideArduinoDatum
-
+from utils import InsideArduinoReading, InsideArduinoDatum
+from utils import OutsideArduinoReading, OutsideArduinoDatum
 
 Base = None
 DavisDbClass = None
@@ -17,7 +16,19 @@ ArduinoOutDbClass = None
 
 
 class DbManager:
+    _instance = None
+    _initialized = False
+
+    def __new__(cls, *args, **kwargs):
+        if cls._instance is None:
+            cls._instance = super(DbManager, cls).__new__(cls)
+        return cls._instance
+
     def __init__(self):
+        if self._initialized:
+            return
+
+        cfg = make_cfg()
         conf = cfg.database
         self.schema = conf.schema
         self.db_url = f"postgresql+psycopg2://{conf.user}:{conf.password}@{conf.host}/{conf.name}"
@@ -32,6 +43,7 @@ class DbManager:
         self.ArduinoIn = None
         self.Vantage = None
         self.Base = None
+        self._initialized = True
 
     def connect(self):
         global Base, DavisDbClass, ArduinoInDbClass, ArduinoOutDbClass
@@ -46,7 +58,8 @@ class DbManager:
         ArduinoOutDbClass = Base.classes.arduino_out
 
     def disconnect(self):
-        self.engine.dispose()
+        if self.engine is not None:
+            self.engine.dispose()
 
     def open_session(self):
         self.session = Session(self.engine)
@@ -110,6 +123,8 @@ class DbManager:
         self.session.commit()
 
 
-db_manager = DbManager()
-db_manager.connect()
-db_manager.open_session()
+def make_db_manager():
+    return DbManager()
+
+# db_manager.connect()
+# db_manager.open_session()
