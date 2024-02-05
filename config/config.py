@@ -124,7 +124,8 @@ class Config:
         self.stations_in_use = list()
         self.toml = {}
         self.enabled_stations = list()
-        self.filename = '/home/ocs/python/WeatherSafety/config/safety.toml'
+        # self.filename = '/home/ocs/python/WeatherSafety/config/safety.toml'
+        self.filename = 'config/safety.toml'
 
         with open(self.filename, 'r') as file:
             self.toml = deepcopy(tomlkit.load(file))
