@@ -10,7 +10,7 @@ from astropy.coordinates import EarthLocation
 
 from config.config import make_cfg
 from station import Station, Reading
-from sensor import SensorSettings, Sensor
+from sensor import Sensor
 from utils import HumanIntervention, SafetyResponse
 
 

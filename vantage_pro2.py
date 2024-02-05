@@ -170,7 +170,7 @@ class VantagePro2(SerialStation):
 
         try:
             reading = self.__loop()
-            self.logger.info("got LOOP packet")
+            self.logger.debug("got LOOP packet")
         except Exception as ex:
             self.logger.error("failed to get a LOOP packet", exc_info=ex)
             self.ser.close()
@@ -238,7 +238,6 @@ class VantagePro2(SerialStation):
         return False
 
     def __test(self):
-        # TODO: fix this
         # self.ser.reset_output_buffer()
 
         expected_response = b"TEST\n\r"

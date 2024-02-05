@@ -210,7 +210,7 @@ class HumanIntervention:
     filename: str
 
     def __init__(self, human_intervention_file: str):
-        self.filename = human_intervention_file # '/home/ocs/python/WeatherSafety/config/human_intervention.json'
+        self.filename = human_intervention_file
 
     def is_safe(self) -> SafetyResponse:
         response = SafetyResponse()
@@ -218,7 +218,8 @@ class HumanIntervention:
             response.safe = False
             with open(self.filename) as f:
                 content = json.load(f)
-            response.reasons.append(f"sensor 'human-intervention', reason='{content['reason']}', from={content['tstamp']}")
+            response.reasons.append(f"sensor 'human-intervention', reason='{content['reason']}', " +
+                                    f"from={content['tstamp']}")
         return response
 
     def create(self, reason: str):

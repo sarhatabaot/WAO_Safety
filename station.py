@@ -103,7 +103,7 @@ class Station(ABC):
         self.thread = threading.Thread(name="loop-thread",
                                        target=self.fetcher_loop)
 
-        self.logger.info(f"allocating fifo ({nreadings} deep)")
+        self.logger.debug(f"allocating fifo ({nreadings} deep)")
         cfg.station_settings[self.name].nreadings = nreadings
         self.readings = FixedSizeFifo(nreadings)
 
@@ -149,13 +149,9 @@ class Station(ABC):
             for reading in self.readings.data:
                 current.append(reading.datums[datum])
 
-        # curr_size = len(current)
-        # if n > curr_size:
-        #     raise Exception(f"not enough values: {curr_size} of {n}, {formatted_float_list(current)}")
-
         latest = current[-n:]
-        self.logger.info(f"datum '{datum}': all values: {formatted_float_list(current)}, " +
-                         f"latest values: {formatted_float_list(latest)}")
+        self.logger.debug(f"datum '{datum}': all values: {formatted_float_list(current)}, " +
+                          f"latest values: {formatted_float_list(latest)}")
 
         return latest
 
@@ -169,19 +165,15 @@ class Station(ABC):
         sensor: Sensor
 
         if self.sensors:
-            self.logger.info("starting calculations")
+            self.logger.debug("starting calculations")
 
         for sensor in self.sensors:
             if not sensor.settings.enabled:
                 continue
 
             sensor.reasons = list()
-            # go over all the sensors that have this station as their 'source'
             values_were_safe = (sensor.values_out_of_range() == 0)
-            # print(f"sensor '{sensor.name}', values_were_safe: {values_were_safe}, " +
-            #       f"prev_values: {formatted_float_list(sensor.values)}")
 
-            new_values = []
             msg = f"{sensor.settings.project:7s}: sensor '{sensor.name}'"
 
             new_values = copy(self.latest_readings(sensor.settings.datum, sensor.settings.nreadings))
@@ -191,7 +183,7 @@ class Station(ABC):
                 reason = (f"only {len(new_values)} (out of {sensor.settings.nreadings}) " +
                           f"are available: {formatted_float_list(new_values)}")
                 sensor.reasons.append(f"sensor '{sensor.name}': " + reason)
-                self.logger.info(msg + reason)
+                self.logger.debug(msg + reason)
                 continue
 
             if sensor.settings.nreadings == 1 and hasattr(self, 'is_safe') and callable(self.is_safe):
@@ -237,14 +229,16 @@ class Station(ABC):
                                 sensor.started_settling = datetime.datetime.now()
                                 sensor.safe = False
                                 sensor.reasons.append(
-                                    f"sensor '{sensor.name}': " + f"started settling for {sensor.settings.settling} seconds")
+                                    f"sensor '{sensor.name}': " +
+                                    f"started settling for {sensor.settings.settling} seconds")
 
                 else:
                     sensor.safe = False
                     sensor.started_settling = Never
                     sensor.reasons.append(
                         f"sensor '{sensor.name}': " + f"{baddies} out of {sensor.settings.nreadings} are out of " +
-                        f"range (min={sensor.settings.min}, max={sensor.settings.max}), values={formatted_float_list(new_values)}")
+                        f"range (min={sensor.settings.min}, max={sensor.settings.max}), " +
+                        f"values={formatted_float_list(new_values)}")
 
             msg = f"{msg}: values: {formatted_float_list(new_values)}, is "
             if sensor.safe:

@@ -1,9 +1,0 @@
-[davis_vantage]
-com_port = "/dev/ttyUSB0"
-baud_rate = 19200
-[arduino_in]
-com_port = "/dev/ttyUSB1"
-baud_rate = 115200
-[arduino_out]
-com_port = "/dev/ttyACM0"
-baud_rate = 115200

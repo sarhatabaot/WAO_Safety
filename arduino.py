@@ -2,9 +2,7 @@ import time
 from abc import ABC, abstractmethod
 from typing import Tuple, Union
 
-from serial_weather_device import SerialWeatherDevice
-from my_parser import Parser
-from station import SerialStation
+from arduino_parser import ArduinoParser
 
 
 class Arduino(ABC):
@@ -50,12 +48,12 @@ class Arduino(ABC):
         All the arduino responses are in the format of: <some text><value><some text><value 2><some text>.
         :param param_name: name of query
         :param wait: time to sleep
-        :param format_str: format of the response. See Parser documentation for details.
+        :param format_str: format of the response. See ArduinoParser documentation for details.
         :return: A tuple contaminating the values from the response
         """
         response = self._query(param_name, wait)
 
-        return Parser.parse(format_str, response)
+        return ArduinoParser.parse(format_str, response)
 
     @abstractmethod
     def get_correct_file(self) -> str:

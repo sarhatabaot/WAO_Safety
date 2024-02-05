@@ -37,8 +37,6 @@ class InsideArduino(SerialStation, Arduino):
         return [item.value for item in InsideArduinoDatum]
 
     def fetcher(self) -> None:
-        # print(f"{self.name} fetcher is bypassed")
-        # return
 
         try:
             self.ser = serial.Serial(port=self.port, baudrate=self.baud,

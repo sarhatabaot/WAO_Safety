@@ -93,9 +93,12 @@ class Sensor:
         Checks if the sensor's settling period has ended
         :return:
         """
+        if self.started_settling == Never:
+            return True
+
         needed_settling = (datetime.datetime.now() - self.started_settling)
         if needed_settling <= self.settling_delta:
-            self.reasons.append(f"Is settling, for {needed_settling} more")
+            self.reasons.append(f"is settling, for {needed_settling} more seconds")
             return False
         else:
             self.station.logger.info(f"'{self.name}' ended settling period")
@@ -111,9 +114,9 @@ class Sensor:
             values = self.values
 
         if isinstance(self.settings, SunElevationSettings):
-            return 0  # TODO
+            return 0  # TBD
         elif isinstance(self.settings, HumanInterventionSettings):
-            return 0  # TODO
+            return 0  # TBD
         elif isinstance(self.settings, MinMaxSettings):
 
             if isinstance(values, (int, float)):

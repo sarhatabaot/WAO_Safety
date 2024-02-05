@@ -1,8 +1,0 @@
-[davis_vantage]
-active = true
-[arduino_in]
-active = true
-[arduino_out]
-active = true
-[sun_elevation_calculator]
-active = false

@@ -1,7 +1,7 @@
 from typing import List
 
 
-class Parser:
+class ArduinoParser:
     @staticmethod
     def _parse_single(value: str, format_specifier: str):
         try:
@@ -92,7 +92,7 @@ class Parser:
                 str_to_parse = remaining_response[before_index + len(before):]
                 remaining_response = ""
 
-            value = Parser._parse_single(str_to_parse, format_specifiers[i])
+            value = ArduinoParser._parse_single(str_to_parse, format_specifiers[i])
 
             if value is None:
                 return None

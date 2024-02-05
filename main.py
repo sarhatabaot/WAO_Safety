@@ -1,10 +1,8 @@
 import logging
-import datetime
-from typing import Dict, Optional
+from typing import Dict
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, root_validator
 
 from vantage_pro2 import VantagePro2
 from internal import Internal
@@ -13,7 +11,7 @@ from outside_arduino import OutsideArduino
 from station import Station
 
 from config.config import make_cfg, Config
-from utils import ExtendedJSONResponse, SafetyResponse, Never
+from utils import ExtendedJSONResponse, SafetyResponse
 from init_log import init_log
 from db_access import make_db_manager
 from enum import Enum
@@ -129,6 +127,7 @@ async def create_human_intervention():
 
     internal.human_intervention.remove()
     return "ok"
+
 
 def is_safe(project: str) -> SafetyResponse:
     if project is None:
