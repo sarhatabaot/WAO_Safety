@@ -69,9 +69,7 @@ class Cyclope(IPStation):
                 #           *)
 
         except Exception as ex:
-            self.logger.error(f"Exception: {ex}")
-
-
+            self.logger.error(f"['{self.host}':{self.port}], Exception: {ex}")
         # reading = response
         # self.zenith_seeing = float(reading['Last_ZenithArcsec'])
         # self.r0 = float(reading['Last_R0Arcsec'])
