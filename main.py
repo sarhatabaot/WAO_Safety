@@ -1,4 +1,5 @@
 import logging
+import argparse
 from typing import Dict, Any
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
@@ -13,7 +14,7 @@ from tessw import TessW
 
 from config.config import make_cfg, Config
 from utils import ExtendedJSONResponse, SafetyResponse
-from init_log import init_log
+from init_log import init_log, set_log_level
 from db_access import make_db_manager
 from enum import Enum
 
@@ -50,7 +51,7 @@ def make_stations():
                 if sensor.settings.station == name:
                     station.sensors.append(sensor)
 
-        logger.info(f"adding station '{name}'")
+        logger.debug(f"adding station '{name}'")
         stations[name] = station
         stations[name].start()
 
@@ -116,7 +117,7 @@ async def get_global_status():
     return is_safe('default')
 
 
-@app.get("/human-intervention/create", tags=["safety"])
+@app.get("/human-intervention/create", tags=["human-intervention"])
 async def create_human_intervention(reason: str):
     internal: Internal = stations['internal']
 
@@ -124,8 +125,8 @@ async def create_human_intervention(reason: str):
     return "ok"
 
 
-@app.get("/human-intervention/remove", tags=["safety"])
-async def create_human_intervention():
+@app.get("/human-intervention/remove", tags=["human-intervention"])
+async def remove_human_intervention():
     internal: Internal = stations['internal']
 
     internal.human_intervention.remove()
@@ -151,6 +152,13 @@ def is_safe(project: str) -> SafetyResponse:
 
 if __name__ == "__main__":
     import uvicorn
+
+    parser = argparse.ArgumentParser(description="A safety data-gathering daemon")
+    parser.add_argument('-d', '--debug', action='store_true', help='Debug to stdout')
+
+    args = parser.parse_args()
+    if args.debug:
+        logging.basicConfig(level=logging.DEBUG)
 
     svr = cfg.server
     uvicorn.run("main:app", host=svr.host, port=svr.port, reload=True)
