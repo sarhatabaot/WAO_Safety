@@ -159,7 +159,7 @@ class Config:
             settings_dict = self.toml['sensors'][sensor_name]
             enabled = settings_dict['enabled'] if 'enabled' in settings_dict else False
             if not enabled:
-                logger.info(f"project 'default': skipping '{sensor_name}' (not enabled)")
+                logger.debug(f"project 'default': skipping '{sensor_name}' (not enabled)")
                 continue
             station_name, datum = split_source(settings_dict['source'])
             if station_name not in self.station_settings:
@@ -172,7 +172,7 @@ class Config:
             settings_dict['datum'] = datum
             if station_name not in self.enabled_stations:
                 settings_dict['enabled'] = False
-                logger.info(f"project: 'default': skipping '{sensor_name}' (station '{station_name}' not enabled)")
+                logger.debug(f"project: 'default': skipping '{sensor_name}' (station '{station_name}' not enabled)")
                 continue
 
             if sensor_name == SunElevationSensorName:
@@ -187,7 +187,7 @@ class Config:
                 name=sensor_name,
                 settings=settings,
             )
-            logger.info(f"project: 'default', adding '{new_sensor.name}'")
+            logger.debug(f"project: 'default', adding '{new_sensor.name}'")
             self.sensors['default'].append(new_sensor)
 
         # copy all default sensors to the projects
@@ -207,7 +207,7 @@ class Config:
                         sensor.settings.__dict__.update(project_dict)
                         if sensor.settings.enabled:
                             if sensor.settings.station not in self.enabled_stations:
-                                logger.info(f"sensor '{sensor.name}' (project '{project}') was disabled " +
+                                logger.debug(f"sensor '{sensor.name}' (project '{project}') was disabled " +
                                             f"(station '{sensor.settings.station}' is disabled)'")
                                 sensor.settings.enabled = False
                     else:  # this sensor is defined for this project only
@@ -232,7 +232,7 @@ class Config:
                     self.stations_in_use.append(s.settings.station)
 
         self._initialized = True
-        self.dump()
+        # self.dump()
 
     def dump(self):
         print("")
