@@ -16,7 +16,7 @@ case ${1} in
     start)
       cd ~/python/WeatherSafety
       source venv/bin/activate
-      python3 ${OPTIONS} ~/python/WeatherSafety/main.py
+      python3 ${OPTIONS} ~/python/WeatherSafety/main.py >/dev/null 2>&1
       ;;
 
     stop)
