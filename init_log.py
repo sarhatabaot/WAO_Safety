@@ -3,14 +3,7 @@ import platform
 import os
 import datetime
 
-default_log_level = logging.INFO
 default_encoding = "utf-8"
-
-
-def set_log_level(level):
-    global default_log_level
-
-    default_log_level= level
 
 
 class PathMaker:
@@ -110,7 +103,6 @@ class DailyFileHandler(logging.FileHandler):
 
 def init_log(logger: logging.Logger):
     logger.propagate = False
-    logger.setLevel(logging.INFO if default_log_level is None else default_log_level)
 
     formatter = logging.Formatter(
             '%(asctime)s - %(levelname)-8s ' +
@@ -119,12 +111,11 @@ def init_log(logger: logging.Logger):
 
     if not any(isinstance(h, logging.StreamHandler) for h in logger.handlers):
         handler = logging.StreamHandler()
-        handler.setLevel(default_log_level)
         handler.setFormatter(formatter)
+        handler.setLevel(logging.Logger.root.level)
         logger.addHandler(handler)
 
     if not any(isinstance(h, DailyFileHandler) for h in logger.handlers):
         handler = DailyFileHandler(path=path_maker.make_logfile_name(), mode='a')
-        handler.setLevel(default_log_level)
         handler.setFormatter(formatter)
         logger.addHandler(handler)
