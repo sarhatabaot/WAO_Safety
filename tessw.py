@@ -27,7 +27,7 @@ class TessW(IPStation):
             response = httpx.request(method="GET", url=url)
             response.raise_for_status()
         except Exception as ex:
-            self.logger.error(f"Error (url={url})", exc_info=ex)
+            self.logger.debug(f"Exception {ex} (url={url})")
             return
 
         reading = xmltodict(response.content)
