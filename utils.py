@@ -74,7 +74,7 @@ class FixedSizeFifo:
 class DateTimeEncoder(JSONEncoder):
     def default(self, obj):
         if isinstance(obj, datetime.datetime):
-            return obj.isoformat()
+            return None if obj == Never else obj.isoformat()
         # Let the base class default method raise the TypeError
         return JSONEncoder.default(self, obj)
 
@@ -111,17 +111,6 @@ class Singleton:
         if cls._instance is None:
             cls._instance = super(Singleton, cls).__new__(cls)
         return cls._instance
-
-
-# class SingletonFactory:
-#     _instances = {}
-#
-#     def __new__(cls, class_type, *args, **kwargs):
-#         if class_type not in cls._instances:
-#             instance = super().__new__(class_type)
-#             class_type.__init__(instance, *args, **kwargs)
-#             cls._instances[class_type] = instance
-#         return cls._instances[class_type]
 
 
 class Reading:

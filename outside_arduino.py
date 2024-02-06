@@ -59,8 +59,8 @@ class OutsideArduino(SerialStation, Arduino):
         self.logger.debug(f"reading: {reading.__dict__}")
         with self.lock:
             self.readings.push(reading)
-        # if hasattr(self, 'saver'):
-        #     self.saver(reading)
+        if hasattr(self, 'saver'):
+            self.saver(reading)
 
     def saver(self, reading: OutsideArduinoReading) -> None:
         from db_access import ArduinoOutDbClass
@@ -77,8 +77,9 @@ class OutsideArduino(SerialStation, Arduino):
             tstamp=reading.tstamp
         )
 
-        self.db_manager.session.add(arduino_out)
-        self.db_manager.session.commit()
+        db_manager = make_db_manager()
+        db_manager.session.add(arduino_out)
+        db_manager.session.commit()
 
     def get_wind(self, reading: OutsideArduinoReading):
         wind_results = self.query("wind", 0.05, "v={f} m/s  dir. {f}°")

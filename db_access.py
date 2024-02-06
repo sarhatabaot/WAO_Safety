@@ -2,7 +2,7 @@ from typing import Optional
 
 from sqlalchemy import create_engine, MetaData, Engine
 from sqlalchemy.ext.automap import automap_base
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 
 from config.config import make_cfg
 from utils import VantageProReading, VantageProDatum
@@ -48,7 +48,7 @@ class DbManager:
     def connect(self):
         global Base, DavisDbClass, ArduinoInDbClass, ArduinoOutDbClass
 
-        self.engine = create_engine(self.db_url)
+        self.engine = create_engine(self.db_url, echo=True)
 
         Base = automap_base()
         Base.prepare(autoload_with=self.engine, schema=self.schema)

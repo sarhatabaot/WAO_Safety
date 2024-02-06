@@ -84,14 +84,14 @@
     host = "x.y.z.w"
     port = 12345
     interval = 60
-    # enabled = true
+    enabled = true
 
 [stations.tessw]
     datums = ["cover"]
     host = "x.y.z.w"
     port = 12345
     interval = 60
-    # enabled = true
+    enabled = true
 
 [stations.internal]
     datums = [ "sun-elevation", "human-intervention" ]

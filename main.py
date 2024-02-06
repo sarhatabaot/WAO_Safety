@@ -1,5 +1,5 @@
 import logging
-from typing import Dict
+from typing import Dict, Any
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
@@ -8,7 +8,8 @@ from vantage_pro2 import VantagePro2
 from internal import Internal
 from inside_arduino import InsideArduino
 from outside_arduino import OutsideArduino
-from station import Station
+from cyclope import Cyclope
+from tessw import TessW
 
 from config.config import make_cfg, Config
 from utils import ExtendedJSONResponse, SafetyResponse
@@ -18,7 +19,7 @@ from enum import Enum
 
 cfg: Config = make_cfg()
 db_manager = make_db_manager()
-stations: Dict[str, Station] = {}
+stations: Dict[str, Any] = {}
 
 
 name_to_class = {
@@ -26,6 +27,8 @@ name_to_class = {
     'davis': VantagePro2,
     'inside-arduino': InsideArduino,
     'outside-arduino': OutsideArduino,
+    'cyclope': Cyclope,
+    'tessw': TessW,
 }
 
 logger: logging.Logger = logging.getLogger('main')
@@ -132,6 +135,10 @@ async def create_human_intervention():
 def is_safe(project: str) -> SafetyResponse:
     if project is None:
         project = 'default'
+
+    for station in stations:
+        if hasattr(station, 'calculate_sensors'):
+            station.calculate_sensors()
 
     ret = SafetyResponse()
     for sensor in cfg.sensors[project]:

@@ -126,9 +126,9 @@ class Station(ABC):
             start_time = time.time()
             try:
                 self.fetcher()
-                self.calculate()
+                self.calculate_sensors()
             except Exception as ex:
-                self.logger.error(f"Could not fetch and calculate", exc_info=ex)
+                self.logger.error(f"Could not fetch and calculate sensors", exc_info=ex)
 
             end_time = time.time()
             # sleep until end of interval
@@ -156,9 +156,11 @@ class Station(ABC):
         return latest
 
     def all_readings(self) -> FixedSizeFifo:
-        return self.readings
+        with self.lock:
+            readings = copy(self.readings)
+        return readings
 
-    def calculate(self):
+    def calculate_sensors(self):
         """
         Called each time a new reading is acquired from the station
         """
@@ -308,7 +310,7 @@ class SerialStation(Station):
         pass
 
 
-class HTTPStation(Station):
+class IPStation(Station):
     """
     A weather Station that gets its values via HTTP
     """
@@ -320,7 +322,7 @@ class HTTPStation(Station):
     def __init__(self, name: str):
         super().__init__(name=name)
 
-        settings = cfg.get(f"stations.{name}")
+        settings = cfg.toml['stations'][name]
         if settings is None:
             msg = f"Cannot get configuration from '{cfg.filename}'"
             self.logger.error(msg)
@@ -331,17 +333,18 @@ class HTTPStation(Station):
             self.logger.error(msg)
             raise Exception(msg)
 
-        if settings.host is None:
-            msg = f"Missing 'host' in configuration in '{cfg.filename}'"
-            self.logger.error(msg)
-            raise Exception(msg)
-        if settings.port:
-            msg = f"Missing 'port' in configuration in '{cfg.filename}'"
+        if settings['host'] is None:
+            msg = f"station '{name}', missing 'host' in configuration in '{cfg.filename}'"
             self.logger.error(msg)
             raise Exception(msg)
 
-        self.host = settings.port
-        self.port = settings.port
+        if settings['port'] is None:
+            msg = f"station '{name}', missing 'port' in configuration in '{cfg.filename}'"
+            self.logger.error(msg)
+            raise Exception(msg)
+
+        self.host = settings['host']
+        self.port = settings['port']
         self.address = f"host={self.host}, port={self.port}"
 
     def fetcher(self) -> None:

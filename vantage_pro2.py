@@ -179,8 +179,8 @@ class VantagePro2(SerialStation):
         if reading:
             with self.lock:
                 self.readings.push(reading)
-            # if hasattr(self, 'saver'):
-            #     self.saver(reading)
+            if hasattr(self, 'saver'):
+                self.saver(reading)
 
     def saver(self, reading: VantageProReading) -> None:
         from db_access import DavisDbClass
@@ -198,8 +198,9 @@ class VantagePro2(SerialStation):
             tstamp=reading.tstamp,
         )
 
-        self.db_manager.session.add(davis)
-        self.db_manager.session.commit()
+        db_manager = make_db_manager()
+        db_manager.session.add(davis)
+        db_manager.session.commit()
 
     def check_right_port(self) -> bool:
         # wakeup if sleeping

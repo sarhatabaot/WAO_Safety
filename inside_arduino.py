@@ -65,8 +65,8 @@ class InsideArduino(SerialStation, Arduino):
         self.logger.debug(f"reading: {reading.__dict__}")
         with self.lock:
             self.readings.push(reading)
-        # if hasattr(self, 'saver'):
-        #     self.saver(reading)
+        if hasattr(self, 'saver'):
+            self.saver(reading)
 
     def saver(self, reading: InsideArduinoReading) -> None:
         from db_access import ArduinoInDbClass
@@ -84,8 +84,9 @@ class InsideArduino(SerialStation, Arduino):
             tstamp=reading.tstamp,
         )
 
-        self.db_manager.session.add(arduino_in)
-        self.db_manager.session.commit()
+        db_manager = make_db_manager()
+        db_manager.session.add(arduino_in)
+        db_manager.session.commit()
 
     def get_light(self, reading: InsideArduinoReading):
         response = self.query("light", 0.08, "light (Lux): {f}")
