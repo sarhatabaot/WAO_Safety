@@ -125,6 +125,3 @@ class DbManager:
 
 def make_db_manager():
     return DbManager()
-
-# db_manager.connect()
-# db_manager.open_session()
