@@ -14,7 +14,7 @@ from tessw import TessW
 
 from config.config import make_cfg, Config
 from utils import ExtendedJSONResponse, SafetyResponse
-from init_log import init_log, set_log_level
+from init_log import init_log
 from db_access import make_db_manager
 from enum import Enum
 
