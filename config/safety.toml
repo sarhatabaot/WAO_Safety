@@ -6,7 +6,7 @@
 #
 [server]
     host = "0.0.0.0"        # address on which the server listens
-    port = 8000             #  and port
+    port = 8001             #  and port
 
 [global]
 
