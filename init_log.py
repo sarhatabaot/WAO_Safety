@@ -36,7 +36,7 @@ class PathMaker:
 
     def make_logfile_name(self):
         daily_folder = self.make_daily_log_folder_name()
-        return os.path.join(daily_folder, 'log.txt')
+        return os.path.join(daily_folder, 'safety-daemon.txt')
 
 
 path_maker = PathMaker()
