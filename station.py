@@ -11,12 +11,15 @@ from copy import copy
 
 import serial
 
-from init_log import init_log
 from sensor import Sensor, MinMaxSettings
 from utils import FixedSizeFifo, Never, formatted_float_list, SafetyResponse
 from config.config import make_cfg
+from init_log import init_log
 
 cfg = make_cfg()
+
+logger = logging.getLogger('station')
+init_log(logger)
 
 
 class Reading:
@@ -81,8 +84,7 @@ class Station(ABC):
             return
 
         self.name = name
-        self.logger = logging.getLogger(self.name)
-        init_log(self.logger)
+        
         self.interval = cfg.station_settings[name].interval
         self.sensors = list()
 
@@ -103,7 +105,7 @@ class Station(ABC):
         self.thread = threading.Thread(name="loop-thread",
                                        target=self.fetcher_loop)
 
-        self.logger.debug(f"allocating fifo ({nreadings} deep)")
+        logger.debug(f"allocating fifo ({nreadings} deep)")
         cfg.station_settings[self.name].nreadings = nreadings
         self.readings = FixedSizeFifo(nreadings)
 
@@ -128,7 +130,7 @@ class Station(ABC):
                 self.fetcher()
                 self.calculate_sensors()
             except Exception as ex:
-                self.logger.error(f"Could not fetch and calculate sensors", exc_info=ex)
+                logger.error(f"Could not fetch and calculate sensors", exc_info=ex)
 
             end_time = time.time()
             # sleep until end of interval
@@ -150,7 +152,7 @@ class Station(ABC):
                 current.append(reading.datums[datum])
 
         latest = current[-n:]
-        self.logger.debug(f"datum '{datum}': all values: {formatted_float_list(current)}, " +
+        logger.debug(f"datum '{datum}': all values: {formatted_float_list(current)}, " +
                           f"latest values: {formatted_float_list(latest)}")
 
         return latest
@@ -167,7 +169,7 @@ class Station(ABC):
         sensor: Sensor
 
         if self.sensors:
-            self.logger.debug("starting calculations")
+            logger.debug("starting calculations")
 
         for sensor in self.sensors:
             if not sensor.settings.enabled:
@@ -185,7 +187,7 @@ class Station(ABC):
                 reason = (f"only {len(new_values)} (out of {sensor.settings.nreadings}) " +
                           f"are available: {formatted_float_list(new_values)}")
                 sensor.reasons.append(f"sensor '{sensor.name}': " + reason)
-                self.logger.debug(msg + reason)
+                logger.debug(msg + reason)
                 continue
 
             if sensor.settings.nreadings == 1 and hasattr(self, 'is_safe') and callable(self.is_safe):
@@ -248,7 +250,7 @@ class Station(ABC):
             else:
                 why = ", ".join(sensor.reasons)
                 msg += f"not safe, reasons: {why}"
-            self.logger.debug(msg)
+            logger.debug(msg)
 
 
 class SerialStation(Station):
@@ -268,22 +270,22 @@ class SerialStation(Station):
         settings = cfg.station_settings[name]
         if settings is None:
             msg = f"Cannot get configuration from '{cfg.filename}'"
-            self.logger.error(msg)
+            logger.error(msg)
             raise Exception(msg)
 
         if name not in cfg.enabled_stations:
             msg = f"not enabled in '{cfg.filename}'"
-            self.logger.error(msg)
+            logger.error(msg)
             raise Exception(msg)
 
         if settings.serial is None:
             msg = f"Missing 'serial' in configuration '{cfg.filename}'"
-            self.logger.error(msg)
+            logger.error(msg)
             raise Exception(msg)
 
         if settings.baud is None:
             msg = f"Missing 'baud' in configuration in '{cfg.filename}'"
-            self.logger.error(msg)
+            logger.error(msg)
             raise Exception(msg)
 
         self.timeout = settings.timeout if hasattr(settings, 'timeout') else None
@@ -300,7 +302,7 @@ class SerialStation(Station):
         # try:
         #     self.ser = serial.Serial(port=self.port, baudrate=self.baud, timeout=self.timeout)
         # except Exception as ex:
-        #     self.logger.error(f"Cannot open serial at {self.address}", exc_info=ex)
+        #     logger.error(f"Cannot open serial at {self.address}", exc_info=ex)
         #     raise
 
     def fetcher(self) -> None:
@@ -325,22 +327,22 @@ class IPStation(Station):
         settings = cfg.toml['stations'][name]
         if settings is None:
             msg = f"Cannot get configuration from '{cfg.filename}'"
-            self.logger.error(msg)
+            logger.error(msg)
             raise Exception(msg)
 
         if name not in cfg.enabled_stations:
             msg = f"not enabled in '{cfg.filename}'"
-            self.logger.error(msg)
+            logger.error(msg)
             raise Exception(msg)
 
         if settings['host'] is None:
             msg = f"station '{name}', missing 'host' in configuration in '{cfg.filename}'"
-            self.logger.error(msg)
+            logger.error(msg)
             raise Exception(msg)
 
         if settings['port'] is None:
             msg = f"station '{name}', missing 'port' in configuration in '{cfg.filename}'"
-            self.logger.error(msg)
+            logger.error(msg)
             raise Exception(msg)
 
         self.host = settings['host']

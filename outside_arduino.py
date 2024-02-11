@@ -10,6 +10,9 @@ from init_log import init_log
 from arduino import Arduino
 from db_access import make_db_manager, DbManager
 
+logger = logging.getLogger('outside-arduino')
+init_log(logger)
+
 
 class OutsideArduino(SerialStation, Arduino):
 
@@ -17,12 +20,11 @@ class OutsideArduino(SerialStation, Arduino):
 
     def __init__(self, name: str):
         self.name = name
-        self.logger = logging.getLogger(self.name)
-        init_log(self.logger)
+
         try:
             super().__init__(name=self.name)
         except Exception as ex:
-            self.logger.error(f"Cannot construct SerialStation for '{self.name}'", exc_info=ex)
+            logger.error(f"Cannot construct SerialStation for '{self.name}'", exc_info=ex)
             return
 
         cfg = make_cfg()
@@ -41,7 +43,7 @@ class OutsideArduino(SerialStation, Arduino):
             self.ser = serial.Serial(port=self.port, baudrate=self.baud,
                                      timeout=self.timeout, write_timeout=self.write_timeout)
         except Exception as ex:
-            self.logger.error(f"Could not open '{self.port}", exc_info=ex)
+            logger.error(f"Could not open '{self.port}", exc_info=ex)
             self.ser.close()
             return
 
@@ -51,12 +53,12 @@ class OutsideArduino(SerialStation, Arduino):
             self.get_pressure_humidity_temperature(reading)
             self.ser.close()
         except Exception as ex:
-            self.logger.error(f"Failed to get readings", exc_info=ex)
+            logger.error(f"Failed to get readings", exc_info=ex)
             self.ser.close()
             return
 
         reading.tstamp = datetime.datetime.utcnow()
-        self.logger.debug(f"reading: {reading.__dict__}")
+        logger.debug(f"reading: {reading.__dict__}")
         with self.lock:
             self.readings.push(reading)
         if hasattr(self, 'saver'):

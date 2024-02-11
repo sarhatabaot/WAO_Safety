@@ -4,12 +4,12 @@ from copy import deepcopy
 
 import tomlkit
 
-from init_log import init_log
+# from init_log import init_log
 from sensor import Sensor, MinMaxSettings, HumanInterventionSettings, SunElevationSettings
 from utils import split_source, SunElevationSensorName, HumanInterventionSensorName
 
 logger: logging.Logger = logging.getLogger('config')
-init_log(logger)
+# init_log(logger)
 
 
 class StationSettings:
@@ -124,7 +124,6 @@ class Config:
         self.stations_in_use = list()
         self.toml = {}
         self.enabled_stations = list()
-        # self.filename = '/home/ocs/python/WeatherSafety/config/safety.toml'
         self.filename = 'config/safety.toml'
 
         with open(self.filename, 'r') as file:

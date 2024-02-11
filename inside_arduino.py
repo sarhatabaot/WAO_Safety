@@ -5,10 +5,13 @@ import serial
 
 from station import SerialStation
 from config.config import make_cfg
-from init_log import init_log
 from arduino import Arduino
 from db_access import make_db_manager, DbManager
 from utils import InsideArduinoDatum, InsideArduinoReading
+from init_log import init_log
+
+logger = logging.getLogger('inside-arduino')
+init_log(logger)
 
 
 class InsideArduino(SerialStation, Arduino):
@@ -17,13 +20,11 @@ class InsideArduino(SerialStation, Arduino):
 
     def __init__(self, name: str):
         self.name = name
-        self.logger = logging.getLogger(self.name)
-        init_log(self.logger)
 
         try:
             super().__init__(name=self.name)
         except Exception as ex:
-            self.logger.error(f"Cannot construct SerialStation for '{self.name}'", exc_info=ex)
+            logger.error(f"Cannot construct SerialStation for '{self.name}'", exc_info=ex)
             return
 
         cfg = make_cfg()
@@ -42,7 +43,7 @@ class InsideArduino(SerialStation, Arduino):
             self.ser = serial.Serial(port=self.port, baudrate=self.baud,
                                      timeout=self.timeout, write_timeout=self.write_timeout)
         except serial.serialutil.SerialException as ex:
-            self.logger.error(f"Could not open '{self.port}", exc_info=ex)
+            logger.error(f"Could not open '{self.port}", exc_info=ex)
             self.ser.close()
             return
 
@@ -57,12 +58,12 @@ class InsideArduino(SerialStation, Arduino):
             self.get_light(reading)
             self.ser.close()
         except Exception as ex:
-            self.logger.error(f"fetcher: Failed", exc_info=ex)
+            logger.error(f"fetcher: Failed", exc_info=ex)
             self.ser.close()
             raise
 
         reading.tstamp = datetime.datetime.utcnow()
-        self.logger.debug(f"reading: {reading.__dict__}")
+        logger.debug(f"reading: {reading.__dict__}")
         with self.lock:
             self.readings.push(reading)
         if hasattr(self, 'saver'):

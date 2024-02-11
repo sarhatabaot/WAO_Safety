@@ -5,6 +5,12 @@ from enum import Enum
 from typing import List
 import socket
 
+import logging
+from init_log import init_log
+
+logger = logging.getLogger('cyclope')
+init_log(logger)
+
 
 class CyclopeDatum(str, Enum):
     ZenithSeeing = "seeing_zenith"
@@ -29,14 +35,14 @@ class Cyclope(IPStation):
 
                 response = sock.recv(1024).decode()
                 if int(response) != 200:
-                    self.logger.error(f"Expected response 200, got '{response}'")
+                    logger.error(f"Expected response 200, got '{response}'")
                     return
 
                 sock.sendall(f"SysRequest <GetData>".encode())
                 response = sock.recv(1024).decode()
-                self.logger.debug(f"sent 'SysRequest <GetData>', got '{response}'")
+                logger.debug(f"sent 'SysRequest <GetData>', got '{response}'")
                 if not response.startswith("201\n"):
-                    self.logger.error(f"sent 'SysRequest <GetData>', expected response 201, got '{response[0:2]}'")
+                    logger.error(f"sent 'SysRequest <GetData>', expected response 201, got '{response[0:2]}'")
                     return
                 response = response[4:]
                 #                   Returns a list string  ->
@@ -55,9 +61,9 @@ class Cyclope(IPStation):
 
                 sock.sendall("SysRequest <SysStatus>".encode())
                 response = sock.recv(1024).decode()
-                self.logger.debug(f"sent 'SysRequest <SysStatus>', got '{response}'")
+                logger.debug(f"sent 'SysRequest <SysStatus>', got '{response}'")
                 if not response.startswith("201\n"):
-                    self.logger.error(f"sent 'SysRequest <SysStatus>', expected response 201, got '{response[0:2]}'")
+                    logger.error(f"sent 'SysRequest <SysStatus>', expected response 201, got '{response[0:2]}'")
                     return
                 #           (*
                 #            <State=Unknown|0>'
@@ -69,7 +75,7 @@ class Cyclope(IPStation):
                 #           *)
 
         except Exception as ex:
-            self.logger.error(f"['{self.host}':{self.port}], Exception: {ex}")
+            logger.error(f"['{self.host}':{self.port}], Exception: {ex}")
         # reading = response
         # self.zenith_seeing = float(reading['Last_ZenithArcsec'])
         # self.r0 = float(reading['Last_R0Arcsec'])

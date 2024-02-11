@@ -1,4 +1,9 @@
 import logging
+import os
+
+from init_log import config_logging
+# config_logging(logging.DEBUG if os.getenv('DEBUG') else logging.WARNING)
+
 import argparse
 from typing import Dict, Any
 from contextlib import asynccontextmanager
@@ -14,9 +19,10 @@ from tessw import TessW
 
 from config.config import make_cfg, Config
 from utils import ExtendedJSONResponse, SafetyResponse
-from init_log import init_log
+from init_log import config_logging
 from db_access import make_db_manager
 from enum import Enum
+
 
 cfg: Config = make_cfg()
 db_manager = make_db_manager()
@@ -32,8 +38,9 @@ name_to_class = {
     'tessw': TessW,
 }
 
-logger: logging.Logger = logging.getLogger('main')
-init_log(logger)
+
+# logger: logging.Logger = logging.getLogger('main')
+# init_log(logger)
 
 ProjectName = Enum('ProjectName', {proj: proj for proj in cfg.projects})
 StationName = Enum('StationName', {s: s for s in cfg.enabled_stations})
@@ -51,7 +58,7 @@ def make_stations():
                 if sensor.settings.station == name:
                     station.sensors.append(sensor)
 
-        logger.debug(f"adding station '{name}'")
+        # logger.debug(f"adding station '{name}'")
         stations[name] = station
         stations[name].start()
 
@@ -157,8 +164,7 @@ if __name__ == "__main__":
     parser.add_argument('-d', '--debug', action='store_true', help='Debug to stdout')
 
     args = parser.parse_args()
-    if args.debug:
-        logging.basicConfig(level=logging.DEBUG)
+    config_logging(logging.DEBUG if args.debug else logging.INFO)
 
     svr = cfg.server
     uvicorn.run("main:app", host=svr.host, port=svr.port, reload=True)

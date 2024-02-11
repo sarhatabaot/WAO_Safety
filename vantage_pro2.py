@@ -1,15 +1,17 @@
 import datetime
 import logging
 from typing import List
-from enum import Enum
 
 import serial
 
-from station import Reading, SerialStation
+from station import SerialStation
 from utils import VantageProDatum, VantageProReading
-from init_log import init_log
 from config.config import make_cfg
 from db_access import make_db_manager, DbManager
+from init_log import init_log
+
+logger = logging.getLogger('davis')
+init_log(logger)
 
 
 class UnitConverter:
@@ -131,8 +133,6 @@ class VantagePro2(SerialStation):
     def __init__(self, name: str):
         self.name = name
         super().__init__(name=name)
-        self.logger = logging.getLogger(self.name)
-        init_log(self.logger)
 
         cfg = make_cfg()
         self.interval = cfg.station_settings[self.name].interval
@@ -157,22 +157,22 @@ class VantagePro2(SerialStation):
             self.ser = serial.Serial(port=self.port, baudrate=self.baud, timeout=self.timeout,
                                      write_timeout=self.write_timeout)
         except Exception as ex:
-            self.logger.error(f"Could not open '{self.port}'", exc_info=ex)
+            logger.error(f"Could not open '{self.port}'", exc_info=ex)
             self.ser.close()
             return
 
         try:
             self.__wakeup()
         except Exception as ex:
-            self.logger.error("failed to wake up the station", exc_info=ex)
+            logger.error("failed to wake up the station", exc_info=ex)
             self.ser.close()
             return
 
         try:
             reading = self.__loop()
-            self.logger.debug("got LOOP packet")
+            logger.debug("got LOOP packet")
         except Exception as ex:
-            self.logger.error("failed to get a LOOP packet", exc_info=ex)
+            logger.error("failed to get a LOOP packet", exc_info=ex)
             self.ser.close()
             return
 
@@ -227,7 +227,7 @@ class VantagePro2(SerialStation):
             try:
                 self.ser.write(b"\n")
             except Exception as ex:
-                self.logger.error(f"failed to wakeup station", exc_info=ex)
+                logger.error(f"failed to wakeup station", exc_info=ex)
                 raise
 
             response = self.ser.read(len(expected_response))
@@ -255,7 +255,7 @@ class VantagePro2(SerialStation):
             self.ser.write(b"WRD" + bytes([0x12, 0x4D]) + b"\n")
             response = self.ser.read(len(expected_response))
         except Exception as ex:
-            self.logger.error(f"failed probing with WRD", exc_info=ex)
+            logger.error(f"failed probing with WRD", exc_info=ex)
             return False
 
         return response == expected_response
@@ -264,7 +264,7 @@ class VantagePro2(SerialStation):
         try:
             self.ser.write(b"LOOP 1\n")
         except Exception as ex:
-            self.logger.error(f"failed to send/receive a LOOP packet", exc_info=ex)
+            logger.error(f"failed to send/receive a LOOP packet", exc_info=ex)
             return
 
         ack = self.ser.read(1)

@@ -3,6 +3,12 @@ import httpx
 import xmltodict
 from enum import Enum
 from typing import List
+import logging
+
+from init_log import init_log
+
+logger = logging.getLogger('tessw')
+init_log(logger)
 
 
 class TessWDatum(str, Enum):
@@ -27,13 +33,13 @@ class TessW(IPStation):
             response = httpx.request(method="GET", url=url)
             response.raise_for_status()
         except Exception as ex:
-            self.logger.debug(f"Exception {ex} (url={url})")
+            logger.debug(f"Exception {ex} (url={url})")
             return
 
         reading = xmltodict(response.content)
 
         if not reading['IS_Valid']:
-            self.logger.debug(f"Got IS_Valid=False")
+            logger.debug(f"Got IS_Valid=False")
             return
 
         self.cover = float(reading['XXX'])  # TBD
