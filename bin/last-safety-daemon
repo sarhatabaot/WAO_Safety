@@ -20,7 +20,7 @@ case ${1} in
       ;;
 
     stop)
-      pkill -f WeatherSafety/main.py
+      pkill -9 -f WeatherSafety/main.py
       ;;
 
     status)
