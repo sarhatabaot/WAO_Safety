@@ -2,7 +2,8 @@ from typing import Optional
 
 from sqlalchemy import create_engine, MetaData, Engine
 from sqlalchemy.ext.automap import automap_base
-from sqlalchemy.orm import Session
+# from sqlalchemy.orm import Session
+from sqlalchemy.orm import scoped_session, sessionmaker
 
 from config.config import make_cfg
 from utils import VantageProReading, VantageProDatum
@@ -31,12 +32,10 @@ class DbManager:
         cfg = make_cfg()
         conf = cfg.database
         self.schema = conf.schema
-        self.db_url = f"postgresql+psycopg2://{conf.user}:{conf.password}@{conf.host}/{conf.name}"
+        self.url = f"postgresql://{conf.user}:{conf.password}@{conf.host}/{conf.name}"
 
-        self.vantage_table_name = ""
-        self.arduino_in_table_name = ""
-
-        self.session: Optional[Session] = None
+        # self.session: Optional[Session] = None
+        self.session_factory = None
         self.metadata: Optional[MetaData] = None
         self.engine: Optional[Engine] = None
 
@@ -48,7 +47,8 @@ class DbManager:
     def connect(self):
         global Base, DavisDbClass, ArduinoInDbClass, ArduinoOutDbClass
 
-        self.engine = create_engine(self.db_url)
+        self.engine = create_engine(self.url, echo=False)
+        self.session_factory = sessionmaker(bind=self.engine)
 
         Base = automap_base()
         Base.prepare(autoload_with=self.engine, schema=self.schema)
@@ -60,9 +60,6 @@ class DbManager:
     def disconnect(self):
         if self.engine is not None:
             self.engine.dispose()
-
-    def open_session(self):
-        self.session = Session(self.engine)
 
     def close_session(self):
         if self.session is not None:

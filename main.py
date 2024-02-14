@@ -66,10 +66,10 @@ def make_stations():
 @asynccontextmanager
 async def lifespan(_):
     db_manager.connect()
-    db_manager.open_session()
+    # db_manager.open_session()
     make_stations()
     yield
-    db_manager.close_session()
+    # db_manager.close_session()
     db_manager.disconnect()
 
 app = FastAPI(lifespan=lifespan, title="Safety at WAO (the Weizmann Astrophysical Observatory)")

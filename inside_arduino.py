@@ -9,6 +9,7 @@ from arduino import Arduino
 from db_access import make_db_manager, DbManager
 from utils import InsideArduinoDatum, InsideArduinoReading
 from init_log import init_log
+from sqlalchemy.orm import scoped_session
 
 logger = logging.getLogger('inside-arduino')
 init_log(logger)
@@ -85,9 +86,18 @@ class InsideArduino(SerialStation, Arduino):
             tstamp=reading.tstamp,
         )
 
-        db_manager = make_db_manager()
-        db_manager.session.add(arduino_in)
-        db_manager.session.commit()
+        # db_manager = make_db_manager()
+        # db_manager.session.add(arduino_in)
+        Session = scoped_session(self.db_manager.session_factory)
+        session = Session()
+        try:
+            session.add(arduino_in)
+            session.commit()
+        except:
+            session.rollback()
+            raise
+        finally:
+            Session.remove()
 
     def get_light(self, reading: InsideArduinoReading):
         response = self.query("light", 0.08, "light (Lux): {f}")

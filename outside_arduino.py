@@ -9,6 +9,7 @@ from config.config import make_cfg
 from init_log import init_log
 from arduino import Arduino
 from db_access import make_db_manager, DbManager
+from sqlalchemy.orm import scoped_session
 
 logger = logging.getLogger('outside-arduino')
 init_log(logger)
@@ -79,9 +80,18 @@ class OutsideArduino(SerialStation, Arduino):
             tstamp=reading.tstamp
         )
 
-        db_manager = make_db_manager()
-        db_manager.session.add(arduino_out)
-        db_manager.session.commit()
+        # db_manager = make_db_manager()
+        # db_manager.session.add(arduino_out)
+        Session = scoped_session(self.db_manager.session_factory)
+        session = Session()
+        try:
+            session.add(arduino_out)
+            session.commit()
+        except:
+            session.rollback()
+            raise
+        finally:
+            Session.remove()
 
     def get_wind(self, reading: OutsideArduinoReading):
         wind_results = self.query("wind", 0.05, "v={f} m/s  dir. {f}°")

@@ -9,6 +9,7 @@ from utils import VantageProDatum, VantageProReading
 from config.config import make_cfg
 from db_access import make_db_manager, DbManager
 from init_log import init_log
+from sqlalchemy.orm import scoped_session
 
 logger = logging.getLogger('davis')
 init_log(logger)
@@ -198,9 +199,18 @@ class VantagePro2(SerialStation):
             tstamp=reading.tstamp,
         )
 
-        db_manager = make_db_manager()
-        db_manager.session.add(davis)
-        db_manager.session.commit()
+        # db_manager.session.add(davis)
+        # db_manager.session.commit()
+        Session = scoped_session(self.db_manager.session_factory)
+        session = Session()
+        try:
+            session.add(davis)
+            session.commit()
+        except:
+            session.rollback()
+            raise
+        finally:
+            Session.remove()
 
     def check_right_port(self) -> bool:
         # wakeup if sleeping
