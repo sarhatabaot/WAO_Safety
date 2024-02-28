@@ -96,22 +96,25 @@ class OutsideArduino(SerialStation, Arduino):
     def get_wind(self, reading: OutsideArduinoReading):
         wind_results = self.query("wind", 0.05, "v={f} m/s  dir. {f}°")
 
-        reading.datums[OutsideArduinoDatum.WindSpeed] = wind_results[0]
-        reading.datums[OutsideArduinoDatum.WindDirection] = wind_results[1]
+        if wind_results:
+            reading.datums[OutsideArduinoDatum.WindSpeed] = wind_results[0]
+            reading.datums[OutsideArduinoDatum.WindDirection] = wind_results[1]
 
     def get_light(self, reading: OutsideArduinoReading):
         light_results = self.query("light", 0.08, "TSL vis(Lux) IR(luminosity): {i} {i}")
 
-        reading.datums[OutsideArduinoDatum.VisibleLuxOut] = light_results[0]
-        reading.datums[OutsideArduinoDatum.IrLuminosity] = light_results[1]
+        if light_results:
+            reading.datums[OutsideArduinoDatum.VisibleLuxOut] = light_results[0]
+            reading.datums[OutsideArduinoDatum.IrLuminosity] = light_results[1]
 
     def get_pressure_humidity_temperature(self, reading: OutsideArduinoReading):
         results = self.query("pht", 0.08, "P:{f}hPa T:{f}°C RH:{f}% comp RH:{f}% dew point:{f}°C")
 
-        reading.datums[OutsideArduinoDatum.PressureOut] = results[0]
-        reading.datums[OutsideArduinoDatum.TemperatureOut] = results[1]
-        reading.datums[OutsideArduinoDatum.HumidityOut] = results[2]
-        reading.datums[OutsideArduinoDatum.DewPoint] = results[3]
+        if results:
+            reading.datums[OutsideArduinoDatum.PressureOut] = results[0]
+            reading.datums[OutsideArduinoDatum.TemperatureOut] = results[1]
+            reading.datums[OutsideArduinoDatum.HumidityOut] = results[2]
+            reading.datums[OutsideArduinoDatum.DewPoint] = results[3]
 
     def get_correct_file(self) -> str:
         return "Outdoor_multiQuery.ino"

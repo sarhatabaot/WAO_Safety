@@ -101,36 +101,42 @@ class InsideArduino(SerialStation, Arduino):
 
     def get_light(self, reading: InsideArduinoReading):
         response = self.query("light", 0.08, "light (Lux): {f}")
-        reading.datums[InsideArduinoDatum.VisibleLuxIn] = response[0]
+        if response:
+            reading.datums[InsideArduinoDatum.VisibleLuxIn] = response[0]
 
     def get_pressure(self, reading: InsideArduinoReading):
         if reading is None:
             return
 
         response = self.query("pressure", 0.1, "Pressure: {f}hPa")
-        reading.datums[InsideArduinoDatum.PressureIn] = response[0]
+        if response:
+            reading.datums[InsideArduinoDatum.PressureIn] = response[0]
 
     def get_temperature(self, reading: InsideArduinoReading):
         response = self.query("temp", 0.1, "Temperature: {f}°C")
-        reading.datums[InsideArduinoDatum.TemperatureIn] = response[0]
+        if response:
+            reading.datums[InsideArduinoDatum.TemperatureIn] = response[0]
 
     def get_gas(self, reading: InsideArduinoReading):
         if reading is None:
             return
 
         response = self.query("gas", 0.07, "CO2: {i} ppm\tTVOC: {i} ppb\tRaw H2: {i} \tRaw Ethanol: {i}")
-        reading.datums[InsideArduinoDatum.CO2] = response[0]
-        reading.datums[InsideArduinoDatum.VOC] = response[1]
-        reading.datums[InsideArduinoDatum.RawH2] = response[2]
-        reading.datums[InsideArduinoDatum.RawEthanol] = response[3]
+        if response:
+            reading.datums[InsideArduinoDatum.CO2] = response[0]
+            reading.datums[InsideArduinoDatum.VOC] = response[1]
+            reading.datums[InsideArduinoDatum.RawH2] = response[2]
+            reading.datums[InsideArduinoDatum.RawEthanol] = response[3]
 
     def get_flame(self, reading: InsideArduinoReading):
         if reading is None:
             return
 
         response = self.query("flame", 0.05, "IR reading: {i}")
-        reading.datums[InsideArduinoDatum.Flame] = response[0]
+        if response:
+            reading.datums[InsideArduinoDatum.Flame] = response[0]
 
     def get_presence(self, reading: InsideArduinoReading):
         response = self.query("presence", 0.05, "Presence: {i}")
-        reading.datums[InsideArduinoDatum.Presence] = response[0]
+        if response:
+            reading.datums[InsideArduinoDatum.Presence] = response[0]

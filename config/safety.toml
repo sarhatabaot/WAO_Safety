@@ -19,8 +19,8 @@
 
     stations = [
         "davis",            # Davis Instruments Vantage-Pro2 weather station
-        "inside-arduino",   # Inside Arduino
-        "outside-arduino",  # Outside Arduino
+        "insuide-arduino",   # Inside Arduino
+        "outside-ardino",  # Outside Arduino
         "cyclope",          # The Cyclope seeing monitor
         "tessw",            # The TESS-W cloud-cover monitor
         "internal",         # A station that performs internal calculations
