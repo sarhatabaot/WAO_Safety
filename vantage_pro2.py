@@ -1,5 +1,6 @@
 import datetime
 import logging
+import struct
 from typing import List
 
 import serial
@@ -82,7 +83,7 @@ class LoopPacket:
     def _parse_barometer(bar_bytes: bytes):
         barometer = int.from_bytes(bar_bytes, "little")
         # inHg / 1000 to mmHg to hPa to bar
-        return (barometer * 1000.0 / 25.4) * 1.33322 / 1000.0
+        return barometer * 0.0338639
 
     @staticmethod
     def is_crc_correct(packet: bytes):
