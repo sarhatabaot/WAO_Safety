@@ -82,8 +82,8 @@ class LoopPacket:
     @staticmethod
     def _parse_barometer(bar_bytes: bytes):
         barometer = int.from_bytes(bar_bytes, "little")
-        # inHg / 1000 to mmHg to hPa to bar
-        return barometer * 0.0338639
+        # inHg to mBar
+        return barometer * 0.0338639 / 1000
 
     @staticmethod
     def is_crc_correct(packet: bytes):
