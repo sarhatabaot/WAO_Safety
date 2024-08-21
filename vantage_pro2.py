@@ -1,6 +1,6 @@
 import datetime
 import logging
-import struct
+import time
 from typing import List
 
 import serial
@@ -137,8 +137,37 @@ class VantagePro2(SerialStation):
         super().__init__(name=name)
 
         cfg = make_cfg()
+        self.cfg = cfg.toml['stations']['davis']
         self.interval = cfg.station_settings[self.name].interval
         self.db_manager = make_db_manager()
+
+    def detect(self, serial_ports: List[str]) -> List[str]:
+        ret = serial_ports
+        for serial_port in serial_ports:
+            with serial.Serial(port=serial_port, baudrate=self.cfg['baud'], timeout=2) as ser:
+                #
+                # The VantagePro replies with 'TEST\n' when sent 'TEST\n'
+                #
+                try:
+                    ser.write(b'\n')    # wake it up
+                    buf = ser.read(2)
+                    if buf != b'\n\r':
+                        continue
+                    ser.reset_input_buffer()
+                    n = ser.write(b'TEST\n')
+                    if n != 5:
+                        continue
+                    buf = ser.readline()
+                    buf = ser.readline()
+                    if buf == b'\rTEST\n':
+                        ser.close()
+                        ret.remove(serial_port)
+                        self.port = serial_port
+                        logger.info(f"Detected a VantagePro2 station on '{serial_port} at {self.cfg['baud']} baud")
+                        return ret
+                except Exception as e:
+                    ser.close()
+        return ret
 
     @classmethod
     def datums(cls) -> List[str]:

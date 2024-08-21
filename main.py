@@ -1,5 +1,6 @@
 import logging
 import os
+from serial.tools.list_ports_linux import comports
 
 from init_log import config_logging
 # config_logging(logging.DEBUG if os.getenv('DEBUG') else logging.WARNING)
@@ -48,6 +49,8 @@ StationName = Enum('StationName', {s: s for s in cfg.enabled_stations})
 
 def make_stations():
 
+    serial_ports = [c.device for c in comports()]
+
     for name in cfg.enabled_stations:
         constructor = name_to_class[name]
         station = constructor(name=name)
@@ -60,6 +63,8 @@ def make_stations():
 
         # logger.debug(f"adding station '{name}'")
         stations[name] = station
+        if hasattr(station, 'detect'):
+            serial_ports = station.detect(serial_ports)  # returns a list without the used port
         stations[name].start()
 
 

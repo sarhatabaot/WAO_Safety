@@ -1,5 +1,6 @@
 import datetime
 import logging
+import re
 from typing import List
 import serial
 
@@ -29,8 +30,34 @@ class InsideArduino(SerialStation, Arduino):
             return
 
         cfg = make_cfg()
+        self.cfg = cfg.toml['stations']['inside-arduino']
         self.interval = cfg.station_settings[self.name].interval
         self.db_manager = make_db_manager()
+
+    def detect(self, serial_ports: List[str]) -> List[str]:
+        ret = serial_ports
+        for serial_port in serial_ports:
+            with serial.Serial(port=serial_port, baudrate=self.cfg['baud'], timeout=2) as ser:
+                #
+                # The inside Arduino probe protocol:
+                # - send: id?
+                # - get:  Running /home/enrico/Eran/LAST/LAST_EnvironmentArduinoSensors/sketches/Indoor_multiQuery/Indoor_multiQuery.ino, Built Nov  7 2021
+                #
+                try:
+                    n = ser.write(b'id?\r')
+                    if n != 4:
+                        continue
+                    reply = ser.readline()
+                    reply = ser.readline()
+                    if 'Indoor_multiQuery' in str(reply):
+                        ser.close()
+                        ret.remove(serial_port)
+                        self.port = serial_port
+                        logger.info(f"Detected a Indoor Arduino station on '{serial_port} at {self.cfg['baud']} baud")
+                        return ret
+                except Exception as e:
+                    ser.close()
+        return ret
 
     def get_correct_file(self) -> str:
         return "Indoor_multiQuery.ino"
