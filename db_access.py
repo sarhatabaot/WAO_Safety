@@ -62,7 +62,7 @@ class DbManager:
             self.engine.dispose()
 
     def close_session(self):
-        if self.session is not None:
+        if hasattr(self, 'session'):
             self.session.close()
 
     def __del__(self):
