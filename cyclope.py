@@ -1,6 +1,6 @@
 from station import IPStation, Reading
 import httpx
-import xmltodict
+import xml2dict
 from enum import Enum
 from typing import List
 import socket
