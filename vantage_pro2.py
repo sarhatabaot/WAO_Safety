@@ -163,7 +163,7 @@ class VantagePro2(SerialStation):
                         ser.close()
                         ret.remove(serial_port)
                         self.port = serial_port
-                        logger.info(f"Detected a VantagePro2 station on '{serial_port} at {self.cfg['baud']} baud")
+                        logger.info(f"Detected a VantagePro2 station on '{serial_port}' at {self.cfg['baud']} baud")
                         return ret
                 except Exception as e:
                     ser.close()
