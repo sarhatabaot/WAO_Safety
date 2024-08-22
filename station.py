@@ -152,8 +152,8 @@ class Station(ABC):
                 current.append(reading.datums[datum])
 
         latest = current[-n:]
-        logger.debug(f"datum '{datum}': all values: {formatted_float_list(current)}, " +
-                          f"latest values: {formatted_float_list(latest)}")
+        # logger.debug(f"datum '{datum}': all values: {formatted_float_list(current)}, " +
+        #                   f"latest values: {formatted_float_list(latest)}")
 
         return latest
 
@@ -168,8 +168,8 @@ class Station(ABC):
         """
         sensor: Sensor
 
-        if self.sensors:
-            logger.debug("starting calculations")
+        # if self.sensors:
+        #     logger.debug("starting calculations")
 
         for sensor in self.sensors:
             if not sensor.settings.enabled:
@@ -187,7 +187,7 @@ class Station(ABC):
                 reason = (f"only {len(new_values)} (out of {sensor.settings.nreadings}) " +
                           f"are available: {formatted_float_list(new_values)}")
                 sensor.reasons.append(f"sensor '{sensor.name}': " + reason)
-                logger.debug(msg + reason)
+                # logger.debug(msg + reason)
                 continue
 
             if sensor.settings.nreadings == 1 and hasattr(self, 'is_safe') and callable(self.is_safe):
@@ -250,7 +250,7 @@ class Station(ABC):
             else:
                 why = ", ".join(sensor.reasons)
                 msg += f"not safe, reasons: {why}"
-            logger.debug(msg)
+            # logger.debug(msg)
 
 
 class SerialStation(Station):

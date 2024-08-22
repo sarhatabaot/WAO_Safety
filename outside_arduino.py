@@ -1,6 +1,7 @@
 import datetime
 from typing import List
 import serial
+import os
 
 from station import SerialStation
 import logging
@@ -43,6 +44,7 @@ class OutsideArduino(SerialStation, Arduino):
                 # - get:  Running /home/enrico/Eran/LAST/LAST_EnvironmentArduinoSensors/sketches/Outdoor_multiQuery/Outdoor_multiQuery.ino, Built Nov  4 2021
                 #
                 try:
+                    os.system(f"stty -echo < {serial_port}")
                     n = ser.write(b'id?\r')
                     if n != 4:
                         continue
@@ -55,6 +57,7 @@ class OutsideArduino(SerialStation, Arduino):
                         logger.info(f"Detected an Outdoor Arduino station on '{serial_port}' at {self.cfg['baud']} baud")
                         return ret
                 except Exception as e:
+                    logger.exception(f"error: {e}", exc_info=e)
                     ser.close()
         return ret
 
@@ -79,13 +82,14 @@ class OutsideArduino(SerialStation, Arduino):
             self.get_light(reading)
             self.get_pressure_humidity_temperature(reading)
             self.ser.close()
+            logger.info(f"got sensor readings")
         except Exception as ex:
             logger.error(f"Failed to get readings", exc_info=ex)
             self.ser.close()
             return
 
         reading.tstamp = datetime.datetime.utcnow()
-        logger.debug(f"reading: {reading.__dict__}")
+        # logger.debug(f"reading: {reading.__dict__}")
         with self.lock:
             self.readings.push(reading)
         if hasattr(self, 'saver'):

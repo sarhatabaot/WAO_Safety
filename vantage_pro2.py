@@ -166,6 +166,7 @@ class VantagePro2(SerialStation):
                         logger.info(f"Detected a VantagePro2 station on '{serial_port}' at {self.cfg['baud']} baud")
                         return ret
                 except Exception as e:
+                    logger.exception(f"error: {e}", exc_info=e)
                     ser.close()
         return ret
 

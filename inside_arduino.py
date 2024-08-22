@@ -1,6 +1,8 @@
 import datetime
 import logging
+import os
 import re
+from sys import exc_info
 from typing import List
 import serial
 
@@ -44,6 +46,7 @@ class InsideArduino(SerialStation, Arduino):
                 # - get:  Running /home/enrico/Eran/LAST/LAST_EnvironmentArduinoSensors/sketches/Indoor_multiQuery/Indoor_multiQuery.ino, Built Nov  7 2021
                 #
                 try:
+                    os.system(f"stty -echo < {serial_port}")
                     n = ser.write(b'id?\r')
                     if n != 4:
                         continue
@@ -53,9 +56,10 @@ class InsideArduino(SerialStation, Arduino):
                         ser.close()
                         ret.remove(serial_port)
                         self.port = serial_port
-                        logger.info(f"Detected a Indoor Arduino station on '{serial_port}' at {self.cfg['baud']} baud")
+                        logger.info(f"Detected an Indoor Arduino station on '{serial_port}' at {self.cfg['baud']} baud")
                         return ret
                 except Exception as e:
+                    logger.exception(f"error: {e}", exc_info=e)
                     ser.close()
         return ret
 
@@ -85,13 +89,14 @@ class InsideArduino(SerialStation, Arduino):
             self.get_presence(reading)
             self.get_light(reading)
             self.ser.close()
+            logger.info(f"got sensor readings")
         except Exception as ex:
             logger.error(f"fetcher: Failed", exc_info=ex)
             self.ser.close()
             raise
 
         reading.tstamp = datetime.datetime.utcnow()
-        logger.debug(f"reading: {reading.__dict__}")
+        # logger.debug(f"reading: {reading.__dict__}")
         with self.lock:
             self.readings.push(reading)
         if hasattr(self, 'saver'):
