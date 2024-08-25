@@ -23,7 +23,7 @@ class UnitConverter:
 
     @staticmethod
     def mph_to_kph(speed_mph):
-        return speed_mph / 1.60934
+        return speed_mph * 1.60934
 
 
 class LoopPacket:
