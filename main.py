@@ -79,6 +79,12 @@ async def lifespan(_):
 
 app = FastAPI(lifespan=lifespan, title="Safety at WAO (the Weizmann Astrophysical Observatory)")
 
+@app.exception_handler(Exception)
+async def generic_exception_handler(request, exc: Exception):
+    return JSONResponse(
+        status_code=500,
+        content={"message": f"An exception occurred: {exc}"},
+    )
 
 @app.get("/config", tags=["info"])
 async def show_configuration():
