@@ -7,6 +7,9 @@ WorkingDirectory=/home/ocs/python/WAO_Safety
 ExecStart=/home/ocs/python/WAO_Safety/bin/last-safety-daemon start
 ExecStop=/home/ocs/python/WAO_Safety/bin/last-safety-daemon stop
 Restart=always
+Environment="http_proxy=http://bcproxy.weizmann.ac.il:8080"
+Environment="http_proxys=http://bcproxy.weizmann.ac.il:8080"
+Environment="no_proxy=localhost,127.0.0.1"
 
 [Install]
 WantedBy=multi-user.target
