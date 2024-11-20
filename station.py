@@ -185,7 +185,7 @@ class Station(ABC):
             if len(new_values) < sensor.settings.nreadings:
                 sensor.safe = False
                 reason = (f"only {len(new_values)} (out of {sensor.settings.nreadings}) " +
-                          f"are available: {formatted_float_list(new_values)}")
+                          f"readings are available: {formatted_float_list(new_values)}")
                 sensor.reasons.append(f"sensor '{sensor.name}': " + reason)
                 # logger.debug(msg + reason)
                 continue
@@ -240,7 +240,7 @@ class Station(ABC):
                     sensor.safe = False
                     sensor.started_settling = Never
                     sensor.reasons.append(
-                        f"sensor '{sensor.name}': " + f"{baddies} out of {sensor.settings.nreadings} are out of " +
+                        f"sensor '{sensor.name}': " + f"{baddies} out of {sensor.settings.nreadings} readings are out of " +
                         f"range (min={sensor.settings.min}, max={sensor.settings.max}), " +
                         f"values={formatted_float_list(new_values)}")
 
