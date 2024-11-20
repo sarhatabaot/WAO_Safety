@@ -5,7 +5,10 @@ Description=LAST safety data-gathering service
 User=ocs
 WorkingDirectory=/home/ocs/python/WAO_Safety
 ExecStart=/home/ocs/python/WAO_Safety/bin/last-safety-daemon start
-ExecStop=/home/ocs/python/WAO_Safety/bin/last-safety-daemon stop
+#ExecStop=/home/ocs/python/WAO_Safety/bin/last-safety-daemon stop
+ExecStop=/bin/kill -s KILL $MAINPID
+TimeoutStopSec=30
+KillMode=mixed
 Restart=always
 Environment="http_proxy=http://bcproxy.weizmann.ac.il:8080"
 Environment="http_proxys=http://bcproxy.weizmann.ac.il:8080"
