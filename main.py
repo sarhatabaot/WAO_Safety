@@ -5,10 +5,13 @@ from serial.tools.list_ports_linux import comports
 from init_log import config_logging
 # config_logging(logging.DEBUG if os.getenv('DEBUG') else logging.WARNING)
 
+logging.basicConfig(level=logging.DEBUG)
+
 import argparse
 from typing import Dict, Any
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from vantage_pro2 import VantagePro2
@@ -79,12 +82,23 @@ async def lifespan(_):
 
 app = FastAPI(lifespan=lifespan, title="Safety at WAO (the Weizmann Astrophysical Observatory)")
 
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
 @app.exception_handler(Exception)
 async def generic_exception_handler(request, exc: Exception):
     return JSONResponse(
         status_code=500,
         content={"message": f"An exception occurred: {exc}"},
     )
+
 
 @app.get("/config", tags=["info"])
 async def show_configuration():
