@@ -148,7 +148,7 @@
     settling = 600
 
 [sensors.dew-point]     # [centigrades]
-    enabled = true
+    enabled = false
     max = 15
     source = "outside-arduino:dew_point"
     nreadings = 5
