@@ -11,7 +11,7 @@ TimeoutStopSec=30
 KillMode=mixed
 Restart=always
 Environment="http_proxy=http://bcproxy.weizmann.ac.il:8080"
-Environment="http_proxys=http://bcproxy.weizmann.ac.il:8080"
+Environment="https_proxy=http://bcproxy.weizmann.ac.il:8080"
 Environment="no_proxy=localhost,127.0.0.1"
 
 [Install]
