@@ -165,13 +165,17 @@ async def remove_human_intervention():
     internal.human_intervention.remove()
     return "ok"
 
+@app.get("/projects", tags=['Projects'])
+async def projects():
+    return cfg.projects
+
 @app.get("/help", tags=["Help"])
 async def help():
     content = """
     <html>
         <head>
           <meta charset="UTF-8">
-          <title>HTML Table Example</title>
+          <title>WAO Safety Daemon</title>
           <style>
             /* Optional: Add some basic table styling */
             table {
@@ -198,14 +202,15 @@ async def help():
             <table>
                 <caption>WAO Safety Daemon Help</caption>
                 <tr><th>URL</th><th>Description</th></tr>
-                <tr><td>/config</td> <td>Dumps the whole configuration</td></tr>
-                <tr><td>/stations</td><td>Lists the defined stations</td></tr>
-                <tr><td>/stations/{station}</td><td>Dumps state of specified station</td></tr>
-                <tr><td>/{project}/sensors</td><td>Dumps state of the sensors for specified project</td></tr>
-                <tr><td>/{project}/is_safe</td><td>Gets the specified project is_safe value</td></tr>
-                <tr><td>/is_safe</td><td>Gets the global is_safe value</td></tr>
-                <tr><td>/human-intervention/create</td><td>Creates a site-wise human intervention state</td></tr>
-                <tr><td>/human-intervention/remove</td><td>Removes the site-wise human intervention state</td></tr>                
+                <tr><td><code>/config</code></td> <td>Dumps the whole configuration</td></tr>
+                <tr><td><code>/stations</code></td><td>Lists the defined stations</td></tr>
+                <tr><td><code>/projects</code></td><td>Lists the defined projects</td></tr>
+                <tr><td><code>/stations/{<b>station</b>}</code></td><td>Dumps state of specified station</td></tr>
+                <tr><td><code>/{<b>project</b>}/sensors</code></td><td>Dumps state of the sensors for specified project</td></tr>
+                <tr><td>/<code>{<b>project</b>}/is_safe</code></td><td>Gets the specified project is_safe value</td></tr>
+                <tr><td>/<code>is_safe</code></td><td>Gets the global is_safe value</td></tr>
+                <tr><td><code>/human-intervention/create</code></td><td>Creates a site-wise human intervention state</td></tr>
+                <tr><td><code>/human-intervention/remove</code></td><td>Removes the site-wise human intervention state</td></tr>                
             </table>
         </body>
     </html>
