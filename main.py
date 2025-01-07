@@ -1,6 +1,7 @@
 import logging
 import os
 from serial.tools.list_ports_linux import comports
+from starlette.responses import HTMLResponse
 
 from init_log import config_logging
 # config_logging(logging.DEBUG if os.getenv('DEBUG') else logging.WARNING)
@@ -164,6 +165,52 @@ async def remove_human_intervention():
     internal.human_intervention.remove()
     return "ok"
 
+@app.get("/help", tags=["Help"])
+async def help():
+    content = """
+    <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>HTML Table Example</title>
+          <style>
+            /* Optional: Add some basic table styling */
+            table {
+              border-collapse: collapse; /* Combine border lines */
+              /* width: 50%;               /* Table width as a percentage of the page */
+              margin: 20px 0;          /* Spacing above/below the table */
+            }
+            th, td {
+              border: 1px solid #ccc;  /* Light gray border around cells */
+              padding: 8px;            /* Spacing inside each cell */
+              text-align: left;        /* Align text to the left */
+            }
+            th {
+              background-color: #f2f2f2;  /* Slight background color for headers */
+            }
+            caption {
+              caption-side: top;       /* Position caption at the top of the table */
+              font-weight: bold;       /* Make caption text bold */
+              margin-bottom: 8px;      /* Add space between caption and table */
+            }
+          </style>
+        </head>
+        <body>
+            <table>
+                <caption>WAO Safety Daemon Help</caption>
+                <tr><th>URL</th><th>Description</th></tr>
+                <tr><td>/config</td> <td>Dumps the whole configuration</td></tr>
+                <tr><td>/stations</td><td>Lists the defined stations</td></tr>
+                <tr><td>/stations/{station}</td><td>Dumps state of specified station</td></tr>
+                <tr><td>/{project}/sensors</td><td>Dumps state of the sensors for specified project</td></tr>
+                <tr><td>/{project}/is_safe</td><td>Gets the specified project is_safe value</td></tr>
+                <tr><td>/is_safe</td><td>Gets the global is_safe value</td></tr>
+                <tr><td>/human-intervention/create</td><td>Creates a site-wise human intervention state</td></tr>
+                <tr><td>/human-intervention/remove</td><td>Removes the site-wise human intervention state</td></tr>                
+            </table>
+        </body>
+    </html>
+    """
+    return HTMLResponse(content=content, status_code=200)
 
 def is_safe(project: str) -> SafetyResponse:
     if project is None:
