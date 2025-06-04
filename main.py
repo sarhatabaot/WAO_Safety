@@ -205,9 +205,9 @@ async def help():
                 <tr><td><code>/config</code></td> <td>Dumps the whole configuration</td></tr>
                 <tr><td><code>/stations</code></td><td>Lists the defined stations</td></tr>
                 <tr><td><code>/projects</code></td><td>Lists the defined projects</td></tr>
-                <tr><td><code>/stations/{<b>station</b>}</code></td><td>Dumps state of specified station</td></tr>
-                <tr><td><code>/{<b>project</b>}/sensors</code></td><td>Dumps state of the sensors for specified project</td></tr>
-                <tr><td>/<code>{<b>project</b>}/is_safe</code></td><td>Gets the specified project is_safe value</td></tr>
+                <tr><td><code>/stations/{<b>station</b>}</code></td><td>Dumps state of specified <code><b>station</b></code></td></tr>
+                <tr><td><code>/{<b>project</b>}/sensors</code></td><td>Dumps state of the sensors for specified <code><b>project</b></code></td></tr>
+                <tr><td>/<code>{<b>project</b>}/is_safe</code></td><td>Gets the specified <code><b>project</b></code>'s is_safe value</td></tr>
                 <tr><td>/<code>is_safe</code></td><td>Gets the global is_safe value</td></tr>
                 <tr><td><code>/human-intervention/create</code></td><td>Creates a site-wise human intervention state</td></tr>
                 <tr><td><code>/human-intervention/remove</code></td><td>Removes the site-wise human intervention state</td></tr>                
