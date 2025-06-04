@@ -88,8 +88,8 @@
 
 [stations.tessw]
     datums = ["cover"]
-    host = "x.y.z.w"
-    port = 12345
+    host = "192.168.4.1"
+    port = 80
     interval = 60
     enabled = true
 
