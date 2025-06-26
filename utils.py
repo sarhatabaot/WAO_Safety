@@ -144,6 +144,11 @@ class VantageProReading(Reading):
         for name in VantageProDatum.datums():
             self.datums[name] = None
 
+class TessWReading(Reading):
+    def __init__(self):
+        super().__init__()
+        for name in TessWDatum.names():
+            self.datums[name] = None
 
 class OutsideArduinoDatum(str, Enum):
     TemperatureOut = "temperature_out",
@@ -166,6 +171,20 @@ class OutsideArduinoReading(Reading):
         for name in OutsideArduinoDatum.names():
             self.datums[name] = None
 
+
+class TessWDatum(str, Enum):
+    CloudCover = "cover",
+
+    @classmethod
+    def names(cls) -> list:
+        return [item.value for item in cls]
+
+
+class TessWReading(Reading):
+    def __init__(self):
+        super().__init__()
+        for name in TessWDatum.names():
+            self.datums[name] = None
 
 class InsideArduinoDatum(str, Enum):
     TemperatureIn = "temperature_in",

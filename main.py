@@ -1,12 +1,11 @@
 import logging
-import os
 from serial.tools.list_ports_linux import comports
 from starlette.responses import HTMLResponse
 
 from init_log import config_logging
 # config_logging(logging.DEBUG if os.getenv('DEBUG') else logging.WARNING)
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.WARNING)
 
 import argparse
 from typing import Dict, Any

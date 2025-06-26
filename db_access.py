@@ -3,17 +3,19 @@ from typing import Optional
 from sqlalchemy import create_engine, MetaData, Engine
 from sqlalchemy.ext.automap import automap_base
 # from sqlalchemy.orm import Session
-from sqlalchemy.orm import scoped_session, sessionmaker
+from sqlalchemy.orm import sessionmaker
 
 from config.config import make_cfg
 from utils import VantageProReading, VantageProDatum
 from utils import InsideArduinoReading, InsideArduinoDatum
 from utils import OutsideArduinoReading, OutsideArduinoDatum
+from utils import TessWReading, TessWDatum
 
 Base = None
 DavisDbClass = None
 ArduinoInDbClass = None
 ArduinoOutDbClass = None
+TessWDbClass = None
 
 
 class DbManager:
@@ -41,13 +43,14 @@ class DbManager:
 
         self.ArduinoIn = None
         self.Vantage = None
+        self.TessW = None
         self.Base = None
         self._initialized = True
 
     def connect(self):
-        global Base, DavisDbClass, ArduinoInDbClass, ArduinoOutDbClass
+        global Base, DavisDbClass, ArduinoInDbClass, ArduinoOutDbClass, TessWDbClass
 
-        self.engine = create_engine(self.url, echo=False)
+        self.engine = create_engine(self.url, echo=True)
         self.session_factory = sessionmaker(bind=self.engine)
 
         Base = automap_base()
@@ -56,6 +59,7 @@ class DbManager:
         DavisDbClass = Base.classes.davis
         ArduinoInDbClass = Base.classes.arduino_in
         ArduinoOutDbClass = Base.classes.arduino_out
+        TessWDbClass = Base.classes.tessw
 
     def disconnect(self):
         if self.engine is not None:
@@ -117,6 +121,15 @@ class DbManager:
         )
 
         self.session.add(arduino_out)
+        self.session.commit()
+
+    def write_tessw_measurement(self, reading: TessWReading):
+        tessw = TessWDbClass(
+            cover=reading.datum[TessWDatum.CloudCover],
+            tstamp=reading.tstamp
+        )
+
+        self.session.add(tessw)
         self.session.commit()
 
 
