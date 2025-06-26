@@ -1,6 +1,5 @@
 import datetime
 import logging
-import time
 from typing import List
 
 import serial
