@@ -38,12 +38,12 @@
     password = "physics"
     schema = "sensors"
 
-    #
-    # Stations are data-sources, each potentially contributing one or more datums.
-    # NOTE:
-    #   - The station names are used below to define sensor data-sources
-    #   - If not specified, enabled == false
-    #
+#
+# Stations are data-sources, each potentially contributing one or more datums.
+# NOTE:
+#   - The station names are used below to define sensor data-sources
+#   - If not specified, enabled == false
+#
 [stations.davis]
      datums = [
         "barometer", "inside_temperature", "inside_humidity",
