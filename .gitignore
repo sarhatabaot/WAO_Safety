@@ -99,3 +99,5 @@ dmypy.json
 *.db
 
 config/human_intervention.json
+
+.idea
