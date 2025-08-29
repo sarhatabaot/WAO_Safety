@@ -6,6 +6,7 @@ from typing import List
 import logging
 import subprocess
 import datetime
+import time
 
 from init_log import init_log
 from utils import TessWReading
@@ -68,7 +69,8 @@ class TessW(IPStation):
         
         if not interface_is_up:
             self.run_shell_cmd(f"ifconfig {self.wifi_interface} up")
-            _stdout, _ = self.run_shell_cmd(f"ip link show {self.wifi_interface}")
+            time.sleep(3)
+            _, stdout, _ = self.run_shell_cmd(f"ip link show {self.wifi_interface}")
             if 'state UP' in stdout:
                 interface_is_up = True
             else:
