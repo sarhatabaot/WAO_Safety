@@ -84,7 +84,7 @@
     host = "x.y.z.w"
     port = 12345
     interval = 60
-    enabled = true
+    enabled = false
 
 [stations.tessw]
     datums = ["cover"]
