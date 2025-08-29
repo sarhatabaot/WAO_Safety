@@ -72,7 +72,7 @@ class OutsideArduino(SerialStation, Arduino):
         try:
             self.ser = serial.Serial(port=self.port, baudrate=self.baud,
                                      timeout=self.timeout, write_timeout=self.write_timeout)
-        except Serial as ex:
+        except serial.SerialException as ex:
             logger.error(f"Could not open '{self.port}", exc_info=ex)
             self.ser.close()
             return
