@@ -137,6 +137,19 @@ async def get_sensors_for_specific_project(project: ProjectName):
         'sensors': [sensor for sensor in cfg.sensors[name]],
     }
 
+@app.get("/{project}/sensor/{sensor_name}", tags=["info"], response_class=ExtendedJSONResponse)
+async def get_sensor_for_specific_project(project: ProjectName, sensor_name: str):
+    name = str(project).replace('ProjectName.', '')
+    sensor = [sensor for sensor in cfg.sensors[name] if sensor.name == sensor_name][0]
+    station = stations[sensor.settings.station]
+    
+    return {
+        'project': name,
+        'sensor': sensor,
+        "interval": station.interval,
+        "average": sum(sensor.values) / len(sensor.values) if isinstance(sensor.values, list) else None,
+    }
+
 
 @app.get("/{project}/is_safe", tags=["safety"], response_class=ExtendedJSONResponse)
 async def get_project_specific_status(project: ProjectName):
@@ -206,6 +219,7 @@ async def help():
                 <tr><td><code>/projects</code></td><td>Lists the defined projects</td></tr>
                 <tr><td><code>/stations/{<b>station</b>}</code></td><td>Dumps state of specified <code><b>station</b></code></td></tr>
                 <tr><td><code>/{<b>project</b>}/sensors</code></td><td>Dumps state of the sensors for specified <code><b>project</b></code></td></tr>
+                <tr><td><code>/{<b>project</b>}/sensor/{<b>sensor</b>}</code></td><td>Dumps state of the specified <b>sensor</b> for specified <code><b>project</b></code></td></tr>
                 <tr><td>/<code>{<b>project</b>}/is_safe</code></td><td>Gets the specified <code><b>project</b></code>'s is_safe value</td></tr>
                 <tr><td>/<code>is_safe</code></td><td>Gets the global is_safe value</td></tr>
                 <tr><td><code>/human-intervention/create</code></td><td>Creates a site-wise human intervention state</td></tr>
