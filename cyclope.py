@@ -1,12 +1,14 @@
-from station import IPStation, Reading
+from station import IPStation, StationReading
 import httpx
 import xml2dict
 from enum import Enum
 from typing import List
 import socket
+import datetime
 
 import logging
 from init_log import init_log
+from sensor import SensorReading
 
 logger = logging.getLogger('cyclope')
 init_log(logger)
@@ -82,12 +84,16 @@ class Cyclope(IPStation):
 
     def latest_readings(self, datum: str, n: int = 1) -> list:
 
+        sensor_reading = SensorReading()
+        sensor_reading.time =  datetime.utcnow()
         if datum == CyclopeDatum.ZenithSeeing:
-            return [self.zenith_seeing]
+            sensor_reading.value = self.zenith_seeing
+            return [sensor_reading]
         elif datum == CyclopeDatum.R0:
-            return [self.r0]
+            sensor_reading.value = self.r0
+            return [sensor_reading]
 
-    def saver(self, reading: Reading) -> None:
+    def saver(self, reading: StationReading) -> None:
         pass
 
     def calculate_sensors(self):
