@@ -74,7 +74,7 @@ class TessW(IPStation):
             if 'state UP' in stdout:
                 interface_is_up = True
             else:
-                logger.error(f"could not bring interface '{self.wifi_interface} up")
+                # logger.error(f"could not bring interface '{self.wifi_interface} up")
                 return False
         
         if not interface_is_up:

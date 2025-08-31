@@ -50,7 +50,7 @@ class DbManager:
     def connect(self):
         global Base, DavisDbClass, ArduinoInDbClass, ArduinoOutDbClass, TessWDbClass
 
-        self.engine = create_engine(self.url, echo=True)
+        self.engine = create_engine(self.url, echo=False)
         self.session_factory = sessionmaker(bind=self.engine)
 
         Base = automap_base()

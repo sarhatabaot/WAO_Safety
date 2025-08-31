@@ -15,6 +15,7 @@ from sensor import Sensor, MinMaxSettings
 from utils import FixedSizeFifo, Never, formatted_float_list, SafetyResponse
 from config.config import make_cfg
 from init_log import init_log
+from sensor import SensorReading
 
 cfg = make_cfg()
 
@@ -22,7 +23,7 @@ logger = logging.getLogger('station')
 init_log(logger)
 
 
-class Reading:
+class StationReading:
     datums: dict
     tstamp: datetime.datetime
 
@@ -42,13 +43,6 @@ class Station(ABC):
     *Sensors* get a reference to the **Station**'s *Readings* fifo and use the latest ones they need to make safety
     decisions.
     """
-    name: str
-    interval: int
-    readings: FixedSizeFifo
-    nreadings: int
-    sensors: List[Sensor]
-    logger: logging.Logger
-    settings: None
 
     @classmethod
     def datums(cls) -> List[str]:
@@ -66,7 +60,7 @@ class Station(ABC):
         pass
 
     @abstractmethod
-    def saver(self, reading: Reading) -> None:
+    def saver(self, reading: StationReading) -> None:
         """
         Saves a **Station** reading (e.g. to the database)
         """
@@ -78,17 +72,24 @@ class Station(ABC):
 
         :param name: The **Station**'s name
         """
+        # name: str
+        # interval: int
+        # readings: FixedSizeFifo
+        # nreadings: int
+        # sensors: List[Sensor]
+        # logger: logging.Logger
+        # settings: None
 
         if name not in cfg.enabled_stations:
             print(f"station {self.name} is not enabled in '{cfg.filename}'")
             return
 
-        self.name = name
+        self.name: str = name
         
-        self.interval = cfg.station_settings[name].interval
-        self.sensors = list()
+        self.interval: int = cfg.station_settings[name].interval
+        self.sensors: List[Sensor] = []
+        self.nreadings: int = 1
 
-        nreadings = 1
         for project in cfg.projects:
             # foreach project
             for sensor in cfg.sensors[project]:
@@ -98,22 +99,25 @@ class Station(ABC):
                     existing = [s.name for s in self.sensors if s.name == sensor.name]
                     if len(existing) == 0:
                         self.sensors.append(sensor)
-                        nreadings = max(nreadings, sensor.settings.nreadings)
+                        self.nreadings = max(self.nreadings, sensor.settings.nreadings)
 
         self.lock = threading.Lock()
         self.stop_event = threading.Event()
         self.thread = threading.Thread(name="loop-thread",
                                        target=self.fetcher_loop)
 
-        logger.debug(f"allocating fifo ({nreadings} deep)")
-        cfg.station_settings[self.name].nreadings = nreadings
-        self.readings = FixedSizeFifo(nreadings)
+        logger.debug(f"station '{self.name}': allocating readings fifo ({self.nreadings} deep)")
+        cfg.station_settings[self.name].nreadings = self.nreadings
+        self.readings = FixedSizeFifo(self.nreadings)
 
     def start(self):
         if hasattr(self, 'fetcher'):
             self.thread.start()
 
     def __del__(self):
+        self.stop_event.set()
+
+    def stop(self):
         self.stop_event.set()
 
     def fetcher_loop(self):
@@ -149,7 +153,10 @@ class Station(ABC):
         current = list()
         with self.lock:
             for reading in self.readings.data:
-                current.append(reading.datums[datum])
+                r = SensorReading()
+                r.value = reading.datums[datum]
+                r.time = reading.tstamp
+                current.append(r)
 
         latest = current[-n:]
         # logger.debug(f"datum '{datum}': all values: {formatted_float_list(current)}, " +
@@ -175,80 +182,80 @@ class Station(ABC):
             if not sensor.settings.enabled:
                 continue
 
-            sensor.reasons = list()
-            values_were_safe = (sensor.values_out_of_range() == 0)
+            sensor.reasons_for_not_safe = list()
+            values_were_safe = (sensor.values_out_of_range == 0)
 
             msg = f"{sensor.settings.project:7s}: sensor '{sensor.name}'"
 
-            new_values = copy(self.latest_readings(sensor.settings.datum, sensor.settings.nreadings))
-            sensor.values = new_values
-            if len(new_values) < sensor.settings.nreadings:
+            new_readings = copy(self.latest_readings(sensor.settings.datum, sensor.settings.nreadings))
+            sensor.readings = new_readings
+            if len(new_readings) < sensor.settings.nreadings:
                 sensor.safe = False
-                reason = (f"only {len(new_values)} (out of {sensor.settings.nreadings}) " +
-                          f"readings are available: {formatted_float_list(new_values)}")
-                sensor.reasons.append(f"sensor '{sensor.name}': " + reason)
+                reason = (f"only {len(new_readings)} (out of {sensor.settings.nreadings}) " +
+                          f"readings are available: {[reading.value for reading in new_readings]}")
+                sensor.reasons_for_not_safe.append(f"sensor '{sensor.name}': " + reason)
                 # logger.debug(msg + reason)
                 continue
 
             if sensor.settings.nreadings == 1 and hasattr(self, 'is_safe') and callable(self.is_safe):
                 # the station has its own is_safe method
-                sensor.values = new_values[0]
+                sensor.readings = new_readings[0]
                 found = [s for s in cfg.sensors[sensor.settings.project] if s.name == sensor.name]
                 if found:
-                    found[0].values = sensor.values
+                    found[0].readings = sensor.readings
                 response: SafetyResponse = self.is_safe(sensor)
                 sensor.safe = response.safe
-                sensor.reasons = response.reasons
+                sensor.reasons_for_not_safe = response.reasons
             else:
                 # check that the new_values are in range
                 if not isinstance(sensor.settings, MinMaxSettings):
                     # sanity check
                     raise Exception(f"{msg}: SHOULD have settings of type 'MinMaxSettings' " +
                                     f"(not '{type(sensor.settings)})")
-                sensor.values = new_values
+                sensor.readings = new_readings
                 found = [s for s in cfg.sensors[sensor.settings.project] if s.name == sensor.name]
                 if found:
-                    found[0].values = sensor.values
-                baddies = sensor.values_out_of_range()
+                    found[0].readings = sensor.readings
+                baddies = sensor.values_out_of_range
                 values_are_safe = baddies == 0
 
                 if values_are_safe:
                     if values_were_safe:
                         sensor.safe = True
-                        sensor.reasons = None
+                        sensor.reasons_for_not_safe = None
                     else:
                         if 'settling' in sensor.settings and sensor.settings.settling is not None:
-                            if sensor.started_settling is not Never:
+                            if sensor.started_settling is not None:
                                 if sensor.has_settled():
                                     # the settling period ended
                                     sensor.safe = True
-                                    sensor.reasons = None
+                                    sensor.reasons_for_not_safe = None
                                 else:
                                     sensor.safe = False
                                     end = sensor.started_settling + td(seconds=sensor.settings.settling)
                                     td_left = end - datetime.datetime.now()
-                                    sensor.reasons.append(f"sensor '{sensor.name}': " + f"settling for {td_left} more")
+                                    sensor.reasons_for_not_safe.append(f"sensor '{sensor.name}': " + f"settling for {td_left} more")
                             else:
                                 # start the settling period
                                 sensor.started_settling = datetime.datetime.now()
                                 sensor.safe = False
-                                sensor.reasons.append(
+                                sensor.reasons_for_not_safe.append(
                                     f"sensor '{sensor.name}': " +
                                     f"started settling for {sensor.settings.settling} seconds")
 
                 else:
                     sensor.safe = False
-                    sensor.started_settling = Never
-                    sensor.reasons.append(
+                    sensor.started_settling = None
+                    sensor.reasons_for_not_safe.append(
                         f"sensor '{sensor.name}': " + f"{baddies} out of {sensor.settings.nreadings} readings are out of " +
                         f"range (min={sensor.settings.min}, max={sensor.settings.max}), " +
-                        f"values={formatted_float_list(new_values)}")
+                        f"values={formatted_float_list(new_readings)}")
 
-            msg = f"{msg}: values: {formatted_float_list(new_values)}, is "
+            msg = f"{msg}: values: {formatted_float_list(new_readings)}, is "
             if sensor.safe:
                 msg += "safe"
             else:
-                why = ", ".join(sensor.reasons)
+                why = ", ".join(sensor.reasons_for_not_safe)
                 msg += f"not safe, reasons: {why}"
             # logger.debug(msg)
 
@@ -308,7 +315,7 @@ class SerialStation(Station):
     def fetcher(self) -> None:
         pass
 
-    def saver(self, reading: Reading) -> None:
+    def saver(self, reading: StationReading) -> None:
         pass
 
 
@@ -352,5 +359,5 @@ class IPStation(Station):
     def fetcher(self) -> None:
         pass
 
-    def saver(self, reading: Reading) -> None:
+    def saver(self, reading: StationReading) -> None:
         pass

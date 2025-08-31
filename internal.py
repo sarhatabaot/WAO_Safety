@@ -9,8 +9,8 @@ from astropy import units as u
 from astropy.coordinates import EarthLocation
 
 from config.config import make_cfg
-from station import Station, Reading
-from sensor import Sensor
+from station import Station, StationReading
+from sensor import Sensor, SensorReading
 from utils import HumanIntervention, SafetyResponse
 
 
@@ -24,7 +24,7 @@ class Internal(Station):
     latitude: float
     longitude: float
     elevation: float
-    human_intervention: HumanIntervention
+    human_intervention_file: HumanIntervention
 
     def __init__(self, name: str):
         self.name = name
@@ -35,7 +35,7 @@ class Internal(Station):
         self.latitude = location.latitude
         self.longitude = location.longitude
         self.elevation = location.elevation
-        self.human_intervention = HumanIntervention(cfg.toml['stations']['internal']['human-intervention-file'])
+        self.human_intervention_file = HumanIntervention(cfg.toml['stations']['internal']['human-intervention-file'])
 
     def datums(self) -> List[str]:
         return list(InternalDatum.__members__.keys())
@@ -43,10 +43,13 @@ class Internal(Station):
     def fetcher(self) -> None:
         pass
 
-    def saver(self, reading: Reading) -> None:
+    def saver(self, reading: StationReading) -> None:
         pass
 
     def latest_readings(self, datum: str, n: int = 1) -> list:
+
+        sensor_reading = SensorReading()
+        sensor_reading.time = datetime.datetime.now()
 
         if datum == InternalDatum.SunElevation:
             now = Time.now()
@@ -59,10 +62,12 @@ class Internal(Station):
             sun_position = get_sun(now).transform_to(alt_az)
 
             # return elevation of the sun
-            return [sun_position.alt.value]
+            sensor_reading.value = sun_position.alt.value
+            return [sensor_reading]
 
         elif datum == InternalDatum.HumanIntervention:
-            return [os.path.exists(self.human_intervention.filename)]
+            sensor_reading.value = 1 if os.path.exists(self.human_intervention_file.filename) else 0
+            return [sensor_reading]
         
     def is_safe(self, sensor: Sensor) -> SafetyResponse:
         response = SafetyResponse(safe=True)
@@ -70,7 +75,7 @@ class Internal(Station):
             if not (hasattr(sensor.settings, 'dawn') and hasattr(sensor.settings, 'dusk')):
                 raise Exception(f"Missing 'dusk' or 'dawn' in {sensor.settings}")
             elevation = self.latest_readings(InternalDatum.SunElevation)
-            elevation = elevation[0]
+            elevation = elevation[0].value
             current_hour = datetime.datetime.now().hour
 
             msg = f"sensor 'sun': "
@@ -87,7 +92,7 @@ class Internal(Station):
             return response
 
         elif sensor.settings.datum == InternalDatum.HumanIntervention:
-            return self.human_intervention.is_safe()
+            return self.human_intervention_file.is_safe()
 
 
 if __name__ == "__main__":

@@ -79,6 +79,8 @@ async def lifespan(_):
     yield
     # db_manager.close_session()
     db_manager.disconnect()
+    for station in stations:
+        stations[station].stop()
 
 app = FastAPI(lifespan=lifespan, title="Safety at WAO (the Weizmann Astrophysical Observatory)")
 
@@ -147,7 +149,7 @@ async def get_sensor_for_specific_project(project: ProjectName, sensor_name: str
         'project': name,
         'sensor': sensor,
         "interval": station.interval,
-        "average": sum(sensor.values) / len(sensor.values) if isinstance(sensor.values, list) else None,
+        # "average": sum(sensor.readings) / len(sensor.readings) if isinstance(sensor.readings, list) else None,
     }
 
 
@@ -166,7 +168,7 @@ async def get_global_status():
 async def create_human_intervention(reason: str):
     internal: Internal = stations['internal']
 
-    internal.human_intervention.create(reason)
+    internal.human_intervention_file.create(reason)
     return "ok"
 
 
@@ -174,7 +176,7 @@ async def create_human_intervention(reason: str):
 async def remove_human_intervention():
     internal: Internal = stations['internal']
 
-    internal.human_intervention.remove()
+    internal.human_intervention_file.remove()
     return "ok"
 
 @app.get("/projects", tags=['Projects'])
@@ -242,7 +244,7 @@ def is_safe(project: str) -> SafetyResponse:
     for sensor in cfg.sensors[project]:
         if not sensor.safe:
             ret.safe = False
-            for reason in sensor.reasons:
+            for reason in sensor.reasons_for_not_safe:
                 ret.reasons.append(reason)
     return ret
 

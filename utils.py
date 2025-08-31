@@ -241,8 +241,11 @@ class HumanIntervention:
         os.remove(self.filename)
 
 
-def formatted_float_list(ll: list, fmt: str = ".2f") -> str:
-    formatted_values = [f"{v:{fmt}}" for v in ll]
-    formatted_values = '[' + ", ".join(formatted_values) + ']'
+def formatted_float_list(readings: list, fmt: str = ".2f") -> str:
+    try:
+        formatted_values = [f"{reading.value:{fmt}}" for reading in readings]
+        formatted_values = '[' + ", ".join(formatted_values) + ']'
+    except TypeError as e:
+        print(f"{e}")
 
     return formatted_values
