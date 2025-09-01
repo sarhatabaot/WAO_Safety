@@ -154,7 +154,12 @@ async def get_sensors_for_specific_project(project: ProjectName):
 @app.get("/{project}/sensor/{sensor_name}", tags=["info"], response_class=ExtendedJSONResponse)
 async def get_sensor_for_specific_project(project: ProjectName, sensor_name: str):
     name = str(project).replace('ProjectName.', '')
-    sensor = [sensor for sensor in cfg.sensors[name] if sensor.name == sensor_name][0]
+    sensor = None
+    found = [sensor for sensor in cfg.sensors[name] if sensor.name == sensor_name]
+    if not found:
+        return f"no such sensor '{sensor}'"
+    
+    sensor =  found[0]
     station = stations[sensor.settings.station]
     
     from utils import isoformat_zulu
