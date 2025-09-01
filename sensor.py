@@ -53,7 +53,7 @@ class SensorReading:
 
     def __init__(self):
         self.value: float = None
-        self.time: datetime = None
+        self.time = None
 
 
 class Sensor:
