@@ -117,7 +117,7 @@ def datetime_decoder(dct):
 
 class ExtendedJSONResponse(JSONResponse):
     def render(self, content: Any) -> bytes:
-        return json.dumps(content, cls=DateTimeEncoder).encode('utf-8') # default -> cls
+        return json.dumps(content, default=DateTimeEncoder).encode('utf-8')
 
 
 class Source(NamedTuple):
