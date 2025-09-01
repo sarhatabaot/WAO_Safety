@@ -26,6 +26,7 @@ from utils import ExtendedJSONResponse, SafetyResponse
 from init_log import config_logging
 from db_access import make_db_manager
 from enum import Enum
+from canonical import CanonicalResponse, CanonicalResponse_Ok
 
 
 cfg: Config = make_cfg()
@@ -103,36 +104,36 @@ async def generic_exception_handler(request, exc: Exception):
 
 
 @app.get("/config", tags=["info"])
-async def show_configuration():
-    return cfg
+async def show_configuration() -> CanonicalResponse:
+    return CanonicalResponse(value=cfg)
 
 
 @app.get("/stations", tags=["info"])
-async def list_stations():
-    return {
+async def list_stations() -> CanonicalResponse:
+    return CanonicalResponse(value={
         'known': list(cfg.toml['stations'].keys()),
         'enabled': cfg.enabled_stations,
         'in-use': cfg.stations_in_use,
-    }
+    })
 
 
 @app.get("/stations/{station}", tags=["info"], response_class=ExtendedJSONResponse)
-async def get_station_details(station: StationName):
+async def get_station_details(station: StationName) -> CanonicalResponse:
     name = str(station).replace('StationName.', '')
     if name not in stations:
-        return JSONResponse({'msg': f"Bad station name '{name}'  Known stations: {list(stations.keys())}"})
+        # return JSONResponse({'msg': f"Bad station name '{name}'  Known stations: {list(stations.keys())}"})
+        return CanonicalResponse(errors=[f"Bad station name '{name}'  Known stations: {list(stations.keys())}"])
 
     s = stations[name]
-    response = {
+    return CanonicalResponse(value={
         'name': s.name,
         'settings': cfg.station_settings[name],
         'readings': s.readings
-    }
-    return response
+    })
 
 
 @app.get("/{project}/sensors", tags=["info"], response_class=ExtendedJSONResponse)
-async def get_sensors_for_specific_project(project: ProjectName):
+async def get_sensors_for_specific_project(project: ProjectName) -> CanonicalResponse:
     from copy import deepcopy
     from utils import isoformat_zulu
 
@@ -146,18 +147,18 @@ async def get_sensors_for_specific_project(project: ProjectName):
         for reading in readings:
             reading.time = isoformat_zulu(reading.time)
 
-    return {
+    return CanonicalResponse(value={
         'project': project_name,
         'sensors': sensors,
-    }
+    })
 
 @app.get("/{project}/sensor/{sensor_name}", tags=["info"], response_class=ExtendedJSONResponse)
-async def get_sensor_for_specific_project(project: ProjectName, sensor_name: str):
-    name = str(project).replace('ProjectName.', '')
+async def get_sensor_for_specific_project(project: ProjectName, sensor_name: str) -> CanonicalResponse:
+    project_name = str(project).replace('ProjectName.', '')
     sensor = None
-    found = [sensor for sensor in cfg.sensors[name] if sensor.name == sensor_name]
+    found = [sensor for sensor in cfg.sensors[project_name] if sensor.name == sensor_name]
     if not found:
-        return f"no such sensor '{sensor}'"
+        return CanonicalResponse(errors=[f"no sensor named '{sensor_name}' for project '{project_name}'"])
     
     sensor =  found[0]
     station = stations[sensor.settings.station]
@@ -168,42 +169,46 @@ async def get_sensor_for_specific_project(project: ProjectName, sensor_name: str
     s = copy(sensor)
     for reading in s.readings:
         reading.time = isoformat_zulu(reading.time)
-    return {
-        'project': name,
-        'sensor': s,
-        "interval": station.interval,
-    }
+
+    return CanonicalResponse(
+        value={
+            'project': project_name,
+            'sensor': s,
+            "interval": station.interval,
+        })
 
 
 @app.get("/{project}/is_safe", tags=["safety"], response_class=ExtendedJSONResponse)
-async def get_project_specific_status(project: ProjectName):
+async def get_project_specific_status(project: ProjectName) -> CanonicalResponse:
     name = str(project).replace('ProjectName.', '')
-    return is_safe(name)
+
+    return CanonicalResponse(value=is_safe(name))
 
 
 @app.get("/is_safe", tags=["safety"], response_class=ExtendedJSONResponse)
-async def get_global_status():
-    return is_safe('default')
+async def get_global_status() -> CanonicalResponse:
+    return CanonicalResponse(value=is_safe('default'))
 
 
 @app.get("/human-intervention/create", tags=["human-intervention"])
-async def create_human_intervention(reason: str):
+async def create_human_intervention(reason: str) -> CanonicalResponse:
     internal: Internal = stations['internal']
 
     internal.human_intervention_file.create(reason)
-    return "ok"
+    return CanonicalResponse_Ok
 
 
 @app.get("/human-intervention/remove", tags=["human-intervention"])
-async def remove_human_intervention():
+async def remove_human_intervention() -> CanonicalResponse:
     internal: Internal = stations['internal']
 
     internal.human_intervention_file.remove()
-    return "ok"
+    return CanonicalResponse_Ok
 
 @app.get("/projects", tags=['Projects'])
-async def projects():
-    return cfg.projects
+async def projects() -> CanonicalResponse:
+
+    return CanonicalResponse(value=cfg.projects)
 
 @app.get("/help", tags=["Help"])
 async def help():
@@ -254,7 +259,7 @@ async def help():
     """
     return HTMLResponse(content=content, status_code=200)
 
-def is_safe(project: str) -> SafetyResponse:
+def is_safe(project: str) -> CanonicalResponse:
     if project is None:
         project = 'default'
 
@@ -268,7 +273,7 @@ def is_safe(project: str) -> SafetyResponse:
             ret.safe = False
             for reason in sensor.reasons_for_not_safe:
                 ret.reasons.append(reason)
-    return ret
+    return CanonicalResponse(value=ret)
 
 
 if __name__ == "__main__":
