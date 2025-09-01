@@ -133,10 +133,22 @@ async def get_station_details(station: StationName):
 
 @app.get("/{project}/sensors", tags=["info"], response_class=ExtendedJSONResponse)
 async def get_sensors_for_specific_project(project: ProjectName):
-    name = str(project).replace('ProjectName.', '')
+    from copy import deepcopy
+    from utils import isoformat_zulu
+
+    project_name = str(project).replace('ProjectName.', '')
+    sensors = [deepcopy(sensor) for sensor in cfg.sensors[project_name]]
+
+    for sensor in sensors:
+        readings = sensor.readings
+        if not isinstance(readings, list):
+            readings = [readings]
+        for reading in readings:
+            reading.time = isoformat_zulu(reading.time)
+
     return {
-        'project': name,
-        'sensors': [sensor for sensor in cfg.sensors[name]],
+        'project': project_name,
+        'sensors': sensors,
     }
 
 @app.get("/{project}/sensor/{sensor_name}", tags=["info"], response_class=ExtendedJSONResponse)
@@ -145,11 +157,16 @@ async def get_sensor_for_specific_project(project: ProjectName, sensor_name: str
     sensor = [sensor for sensor in cfg.sensors[name] if sensor.name == sensor_name][0]
     station = stations[sensor.settings.station]
     
+    from utils import isoformat_zulu
+    from copy import copy
+
+    s = copy(sensor)
+    for reading in s.readings:
+        reading.time = isoformat_zulu(reading.time)
     return {
         'project': name,
-        'sensor': sensor,
+        'sensor': s,
         "interval": station.interval,
-        # "average": sum(sensor.readings) / len(sensor.readings) if isinstance(sensor.readings, list) else None,
     }
 
 
