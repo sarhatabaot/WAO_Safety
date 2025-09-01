@@ -59,6 +59,32 @@ class FixedSizeFifo:
         return self.data
 
 
+def isoformat_zulu(dt: datetime.datetime) -> str:
+    """
+    Returns an ISO-8601 formatted string with a 'Z' suffix for UTC datetimes
+    :param dt: The datetime to format
+    :return: The ISO-8601 formatted string
+    """
+    if dt.tzinfo is None:
+        return dt.isoformat() + "Z"
+    elif dt.tzinfo.utcoffset(dt) == datetime.timedelta(0):
+        return dt.replace(tzinfo=None).isoformat() + "Z"
+    else:
+        return dt.isoformat()
+
+
+def fromisoformat_zulu(s: str) -> datetime.datetime:
+    """
+    Parses an ISO-8601 formatted string with optional 'Z' suffix for UTC datetimes
+    :param s: The ISO-8601 formatted string
+    :return: The corresponding datetime
+    """
+    if s.endswith("Z"):
+        s = s[:-1]
+        return datetime.datetime.fromisoformat(s).replace(tzinfo=datetime.timezone.utc)
+    else:
+        return datetime.datetime.fromisoformat(s)
+
 # class SingletonFactory:
 #     _instances = {}
 #     _lock = Lock()  # A lock for synchronizing instance creation
@@ -74,7 +100,7 @@ class FixedSizeFifo:
 class DateTimeEncoder(JSONEncoder):
     def default(self, obj):
         if isinstance(obj, datetime.datetime):
-            return None if obj == Never else obj.isoformat()
+            return None if obj == Never else isoformat_zulu(obj)
         # Let the base class default method raise the TypeError
         return JSONEncoder.default(self, obj)
 
@@ -83,7 +109,7 @@ def datetime_decoder(dct):
     for key, value in dct.items():
         if isinstance(value, str):
             try:
-                dct[key] = datetime.datetime.fromisoformat(value)
+                dct[key] = fromisoformat_zulu(value)
             except ValueError:
                 pass  # Not a datetime string, so we leave it unchanged
     return dct
@@ -91,7 +117,7 @@ def datetime_decoder(dct):
 
 class ExtendedJSONResponse(JSONResponse):
     def render(self, content: Any) -> bytes:
-        return json.dumps(content, default=DateTimeEncoder).encode('utf-8')
+        return json.dumps(content, cls=DateTimeEncoder).encode('utf-8') # default -> cls
 
 
 class Source(NamedTuple):
