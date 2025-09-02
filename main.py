@@ -158,7 +158,8 @@ async def get_sensor_for_specific_project(project: ProjectName, sensor_name: str
     sensor = None
     found = [sensor for sensor in cfg.sensors[project_name] if sensor.name == sensor_name]
     if not found:
-        return CanonicalResponse(errors=[f"no sensor named '{sensor_name}' for project '{project_name}'"])
+        project_sensors = [s.name for s in cfg.sensors[project_name]]
+        return CanonicalResponse(errors=[f"no sensor named '{sensor_name}' for project '{project_name}' (sensors: {project_sensors})"])
     
     sensor =  found[0]
     station = stations[sensor.settings.station]
@@ -167,6 +168,8 @@ async def get_sensor_for_specific_project(project: ProjectName, sensor_name: str
     from copy import copy
 
     s = copy(sensor)
+    if not isinstance(s.readings, list):
+        s.readings = [s.readings]
     for reading in s.readings:
         reading.time = isoformat_zulu(reading.time)
 
