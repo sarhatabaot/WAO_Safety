@@ -209,13 +209,16 @@ class Config:
                                 logger.debug(f"sensor '{sensor.name}' (project '{project}') was disabled " +
                                             f"(station '{sensor.settings.station}' is disabled)'")
                                 sensor.settings.enabled = False
+
+                    ## TODO, this does not actually set anything, unless just declaring the classes also sets an instance somewhere
+                    ## TODO possible fix by referencing sensor "sensor.settings" instead of just "settings"
                     else:  # this sensor is defined for this project only
                         if sensor_name == SunElevationSensorName:
-                            settings = SunElevationSettings(project_dict)
+                            sensor.settings = SunElevationSettings(project_dict)
                         elif sensor_name == HumanInterventionSensorName:
-                            settings = HumanInterventionSettings(project_dict)
+                            sensor.settings = HumanInterventionSettings(project_dict)
                         else:
-                            settings = MinMaxSettings(project_dict)
+                            sensor.settings = MinMaxSettings(project_dict)
                         # self.sensors[project].append(
                         #     Sensor(name=project_dict['name'], settings=settings))
 
